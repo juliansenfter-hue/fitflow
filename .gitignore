@@ -1,0 +1,5 @@
+# Dev-Artefakte – nicht fürs Deployment nötig
+screenshots/
+uploads/
+_ds/
+.thumbnail
