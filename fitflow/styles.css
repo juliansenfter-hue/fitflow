@@ -832,6 +832,16 @@ body::after{
   /* kein erzwungenes 410px-Minimum → kein leerer Platz unter dem aufgeklappten Vital-Detail */
   .ff-hero-card{min-height:0 !important}
 }
+/* Touch-Geräte (per JS-Klasse erkannt, unabhängig vom Safari-Desktop-Modus): dieselben
+   iPad-Stapel-Regeln in Hoch- UND Querformat. Kein Breiten-Media-Query, da .is-touch nur
+   auf Touch-Geräten (iPad/Phone) gesetzt ist — Maus-Desktops bleiben unberührt. */
+html.is-touch .ff-grid[data-hero],
+html.is-touch .ff-grid[data-dash]{grid-template-columns:1fr !important}
+html.is-touch .ff-hero-card{min-height:0 !important}
+html.is-touch .ff-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+html.is-touch .ff-week-grid{grid-template-columns:repeat(7,minmax(132px,1fr));min-width:max-content}
+html.is-touch .pl-view{grid-template-columns:minmax(0,1fr)}
+html.is-touch .pl-main{min-height:0}
 
 /* ============================================================
    FORMS — iOS-style filled fields

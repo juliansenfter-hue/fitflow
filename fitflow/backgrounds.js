@@ -14,6 +14,10 @@
    "Hintergrund" section of the Tweaks panel via window.FFBackground.
    ============================================================ */
 (function () {
+  // Touch-Gerät zuverlässig markieren: navigator.maxTouchPoints wird – anders als die
+  // CSS-Media-Features pointer/any-pointer – vom iPad-Safari-Desktop-Modus NICHT verfälscht.
+  // Die Klasse .is-touch lässt die iPad-Layout-Regeln (styles.css) auch im Querformat greifen.
+  try { if ((navigator.maxTouchPoints || 0) > 0) document.documentElement.classList.add('is-touch'); } catch (e) { /* noop */ }
   const KEY = 'ff-bg-v3';
 
   /* curated colour presets — the four the user asked for */
