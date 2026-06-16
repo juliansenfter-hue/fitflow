@@ -181,7 +181,12 @@
     }
     resize();
     window.addEventListener('resize', resize);
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     if (reduced) { frame(false); }
     else {
       let last = 0;
@@ -228,7 +233,12 @@
 
     const hueEl = svg.querySelector('.hue');
     let raf = null;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     if (!reduced && hueEl) {
       let v = 0, last = 0;
       (function loop(t) {
@@ -277,7 +287,12 @@
      ============================================================ */
   function buildPaths() {
     const c = S.color;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', '0 0 696 316');
