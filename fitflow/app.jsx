@@ -196,6 +196,10 @@
        approaches and ramps up the closer you get (the gradient falloff +
        per-card --glow-size set how far that reach extends) */
     useEffect(() => {
+      // Touch-/Pencil-Geräte (iPad: pointer coarse): den wandernden Glow NICHT pro
+      // Pointer-Bewegung neu zeichnen — das Repaint der Radial-Gradienten über dem
+      // Milchglas ist dort zu teuer und ruckelt extrem. Am Desktop (Maus) bleibt er aktiv.
+      if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
       let raf = null, ev = null, cache = null;
       // Karten-Rechtecke werden gecacht und nur bei Scroll/Resize/DOM-Wechsel neu
       // gemessen — so kostet jede Pointer-/Pencil-Bewegung nur noch Arithmetik
