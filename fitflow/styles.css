@@ -829,6 +829,8 @@ body::after{
 @media (max-width:1080px){
   .ff-grid[data-hero],
   .ff-grid[data-dash]{grid-template-columns:1fr !important}
+  /* kein erzwungenes 410px-Minimum → kein leerer Platz unter dem aufgeklappten Vital-Detail */
+  .ff-hero-card{min-height:0 !important}
 }
 
 /* ============================================================

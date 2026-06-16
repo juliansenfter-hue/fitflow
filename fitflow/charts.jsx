@@ -308,7 +308,19 @@
   function TelemetryChart({ series, height = 150, yLabel, unit = '', onHover, pins = [], onTogglePin }) {
     const [hover, setHover] = useState(null);
     const ref = useRef(null);
-    const W = 900, H = height, padT = 12, padB = 18;
+    const wrapRef = useRef(null);
+    // echte Breite messen → viewBox 1:1 zur Pixelbreite, sonst quetscht
+    // preserveAspectRatio:none die Kreis-Marker zu Ovalen und verzerrt die Kurve
+    const [W, setW] = useState(900);
+    useEffect(() => {
+      if (!wrapRef.current) return;
+      const measure = () => { const w = wrapRef.current.clientWidth; if (w) setW(w); };
+      measure();
+      const ro = new ResizeObserver(measure);
+      ro.observe(wrapRef.current);
+      return () => ro.disconnect();
+    }, []);
+    const H = height, padT = 12, padB = 18;
     const all = series.flatMap((s) => s.data);
     const min = Math.min(...all), max = Math.max(...all);
     const len = series[0].data.length;
@@ -323,7 +335,7 @@
     const onMove = (e) => { const i = idxAt(e); setHover(i); onHover && onHover(i); };
     const onClick = (e) => { if (onTogglePin) onTogglePin(idxAt(e)); };
     const leave = () => { setHover(null); onHover && onHover(null); };
-    return h('div', { style: { position: 'relative' } },
+    return h('div', { ref: wrapRef, style: { position: 'relative' } },
       h('svg', { ref, viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'none', onMouseMove: onMove, onClick, onMouseLeave: leave, style: { display: 'block', overflow: 'visible', cursor: compare ? 'crosshair' : 'default' } },
         [0.33, 0.66].map((g, i) => h('line', { key: i, x1: 0, x2: W, y1: padT + g * (H - padT - padB), y2: padT + g * (H - padT - padB), stroke: 'rgba(255,255,255,.05)' })),
         series.map((s, si) => {
