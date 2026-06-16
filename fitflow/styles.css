@@ -826,7 +826,7 @@ body::after{
 }
 /* iPad/Tablet-Hochformat (z. B. 13", 1024px): die obersten 2-Spalten-Reihen
    des Dashboards stapeln, damit Text nicht überlappt und nichts überläuft */
-@media (max-width:1080px){
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
   .ff-grid[data-hero],
   .ff-grid[data-dash]{grid-template-columns:1fr !important}
   /* kein erzwungenes 410px-Minimum → kein leerer Platz unter dem aufgeklappten Vital-Detail */
@@ -892,7 +892,7 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent)}
 /* Tablet/schmal: 7 Tagesspalten würden zu schmal — feste Mindestbreite + horizontales
    Wischen, damit die Trainings lesbar bleiben statt „lang & schmal" gequetscht zu werden */
-@media (max-width:1080px){
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
   .ff-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
   .ff-week-grid{grid-template-columns:repeat(7,minmax(132px,1fr));min-width:max-content}
 }
@@ -1194,7 +1194,7 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .pl-badge{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;
   justify-content:center;font-weight:700;font-size:13px}
 
-@media (max-width:1080px){
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
   .pl-view{grid-template-columns:minmax(0,1fr)}
   .pl-main{min-height:0}
 }
