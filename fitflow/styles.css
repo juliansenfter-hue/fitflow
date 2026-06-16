@@ -522,6 +522,9 @@ body::after{
           mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite:xor;
           mask-composite:exclude;
+  /* eigene Compositor-Ebene: das Neuzeichnen des wandernden Glows bleibt in dieser
+     Ebene und zieht nicht die ganze (Milchglas-)Karte mit → flüssiger bei Hover */
+  transform:translateZ(0);
 }
 /* faint inner wash so the surface still catches a little light */
 .panel::after,.tile::after,.ff-topbar::after{
@@ -529,6 +532,7 @@ body::after{
   background:radial-gradient(var(--glow-size,340px) circle at var(--lx) var(--ly),
     color-mix(in srgb, var(--glow-color) calc(var(--glow-fill) * 100%), transparent),
     transparent 58%);
+  transform:translateZ(0);
 }
 /* the sidebar gets the same white rim light as the cards */
 .ff-sidebar::after,.ff-sidebar::before{content:''}
