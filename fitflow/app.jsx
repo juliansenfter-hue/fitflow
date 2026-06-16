@@ -196,33 +196,49 @@
        approaches and ramps up the closer you get (the gradient falloff +
        per-card --glow-size set how far that reach extends) */
     useEffect(() => {
-      let raf = null, ev = null;
+      let raf = null, ev = null, cache = null;
+      // Karten-Rechtecke werden gecacht und nur bei Scroll/Resize/DOM-Wechsel neu
+      // gemessen — so kostet jede Pointer-/Pencil-Bewegung nur noch Arithmetik
+      // (kein querySelectorAll und kein getBoundingClientRect pro Frame).
+      const rebuild = () => {
+        cache = [];
+        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
+          cache.push({ el, r: el.getBoundingClientRect() });
+        });
+      };
+      const invalidate = () => { cache = null; };
       const apply = () => {
         raf = null;
         if (!ev) return;
-        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
-          const r = el.getBoundingClientRect();
-          // only feed cards the pointer is near (within ~340px) — far cards stay
-          // dark for free (their gradient centre sits off-card) and we skip the work
-          const dx = ev.clientX < r.left ? r.left - ev.clientX : ev.clientX > r.right ? ev.clientX - r.right : 0;
-          const dy = ev.clientY < r.top ? r.top - ev.clientY : ev.clientY > r.bottom ? ev.clientY - r.bottom : 0;
-          if (dx > 340 || dy > 340) { if (el.style.getPropertyValue('--lx')) { el.style.removeProperty('--lx'); el.style.removeProperty('--ly'); } return; }
-          el.style.setProperty('--lx', (ev.clientX - r.left).toFixed(1) + 'px');
-          el.style.setProperty('--ly', (ev.clientY - r.top).toFixed(1) + 'px');
-        });
+        if (!cache) rebuild();
+        const x = ev.clientX, y = ev.clientY;
+        for (let i = 0; i < cache.length; i++) {
+          const el = cache[i].el, r = cache[i].r;
+          // nur Karten in Reichweite (~340px) bekommen den Glow — ferne bleiben dunkel
+          const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+          const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+          if (dx > 340 || dy > 340) { if (el.style.getPropertyValue('--lx')) { el.style.removeProperty('--lx'); el.style.removeProperty('--ly'); } continue; }
+          el.style.setProperty('--lx', (x - r.left).toFixed(1) + 'px');
+          el.style.setProperty('--ly', (y - r.top).toFixed(1) + 'px');
+        }
       };
       const onMove = (e) => { ev = e; if (!raf) raf = requestAnimationFrame(apply); };
       const onLeave = () => {
         ev = null;
-        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
-          el.style.removeProperty('--lx'); el.style.removeProperty('--ly');
-        });
+        if (cache) cache.forEach((c) => { c.el.style.removeProperty('--lx'); c.el.style.removeProperty('--ly'); });
       };
       window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('scroll', invalidate, { passive: true, capture: true });
+      window.addEventListener('resize', invalidate);
       document.addEventListener('pointerleave', onLeave);
+      const mo = new MutationObserver(invalidate); // Screenwechsel/Layoutänderung → Rechtecke neu messen
+      mo.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
       return () => {
         window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('scroll', invalidate, { capture: true });
+        window.removeEventListener('resize', invalidate);
         document.removeEventListener('pointerleave', onLeave);
+        mo.disconnect();
         if (raf) cancelAnimationFrame(raf);
       };
     }, []);

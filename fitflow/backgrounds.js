@@ -367,6 +367,14 @@
     applyIntensity();
   }
 
+  // strukturelle Änderungen (z. B. Balkenanzahl) bauen den Hintergrund komplett neu —
+  // beim Regler-Ziehen auf höchstens 1×/Frame drosseln.
+  let renderRaf = 0;
+  function renderSoon() {
+    if (renderRaf) return;
+    renderRaf = requestAnimationFrame(() => { renderRaf = 0; render(); });
+  }
+
   function init() {
     try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch (e) {}
     render();
@@ -381,7 +389,8 @@
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
       // intensity-only change → just fade, no costly rebuild
       const structural = ['mode', 'color', 'solidColor', 'bars', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
-      if (structural || !root) render();
+      if (!root) render();
+      else if (structural) renderSoon();   // teuren Rebuild auf 1×/Frame drosseln
       else applyIntensity();
       subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
     },

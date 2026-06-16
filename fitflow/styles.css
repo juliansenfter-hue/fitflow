@@ -819,6 +819,12 @@ body::after{
 @media (max-width:900px){
   .ff-content > .ff-grid > .ff-grid{grid-template-columns:1fr !important}
 }
+/* iPad/Tablet-Hochformat (z. B. 13", 1024px): die obersten 2-Spalten-Reihen
+   des Dashboards stapeln, damit Text nicht überlappt und nichts überläuft */
+@media (max-width:1080px){
+  .ff-grid[data-hero],
+  .ff-grid[data-dash]{grid-template-columns:1fr !important}
+}
 
 /* ============================================================
    FORMS — iOS-style filled fields

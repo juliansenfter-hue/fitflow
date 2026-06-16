@@ -555,13 +555,13 @@
           mods.risk && h(RiskBar, { risk: FF.risk }))),
 
       /* ---------- FORM / FITNESS ROW ---------- */
-      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 } },
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
         h(FormFitnessCard, { onNav, allowSim: mods.sim }),
         /* Weekly rhythm */
         h(WochenrhythmusCard, null)),
 
       /* ---------- WEEKLY GOALS + ACTIVITIES ---------- */
-      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 } },
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
         h(Card, { title: 'Wochenziele', icon: 'target',
           right: h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--z4)' } }), w.focus) },
           /* four animated liquid-mesh orbs — same soul as the Recovery Score */
@@ -792,14 +792,14 @@
       h(SportIcon, { sport: a.sport, size: 38, soft: true }),
       h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
         h('div', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, a.title),
-        h('div', { className: 'row center gap-8', style: { fontSize: 11.5, color: 'var(--text-3)' } },
+        h('div', { className: 'row center gap-8', style: { fontSize: 11.5, color: 'var(--text-3)', flexWrap: 'wrap', rowGap: 2 } },
           h('span', null, FF.fmt.date(a.date)),
           h('span', null, '·'), h('span', { className: 'mono' }, FF.fmt.dur(a.duration)),
           a.distance && h(Fragment, null, h('span', null, '·'), h('span', { className: 'mono' }, `${FF.fmt.n(a.distance, 1)} km`)))),
-      h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4 } },
+      h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4, flexShrink: 0 } },
         h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss),
         h('span', { className: 'label', style: { fontSize: 8.5 } }, 'TSS')),
-      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})` } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
+      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
   }
 
   window.Screens = window.Screens || {};
