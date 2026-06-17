@@ -137,14 +137,16 @@
   }
 
   /* ---------- session card (week board) ---------- */
-  function SessionCard({ s, onRemove, onAccept, onOpen, onDragStart, onDragEnd, dragging }) {
+  function SessionCard({ s, onRemove, onAccept, onOpen, onDragStart, onDragEnd, onPointerDown, dragging }) {
     const sp = SPORT[s.sport];
     return h('div', {
-      className: 'ff-sess-card', draggable: true, onDragStart, onDragEnd,
+      className: 'ff-sess-card', draggable: true, onDragStart, onDragEnd, onPointerDown,
       onClick: onOpen, style: {
         background: 'var(--panel-2)', border: `1px solid var(--line)`,
         borderLeft: `3px solid var(--${s.zone})`, borderRadius: 9, padding: '9px 10px', position: 'relative',
         opacity: dragging ? 0.35 : (s.suggested ? 0.94 : 1), borderStyle: s.suggested ? 'dashed' : 'solid',
+        // iPad: die Karte „besitzt" die Touch-Geste (kein Scroll-Hijack), damit Ziehen funktioniert
+        touchAction: onPointerDown ? 'none' : undefined,
       },
     },
       h('div', { className: 'row between center', style: { marginBottom: 5 } },
@@ -259,6 +261,41 @@
   function WeekView({ days, selDay, onSelDay, onAdd, onRemove, onAccept, onAcceptAll, onMove }) {
     const [drag, setDrag] = useState(null);
     const [dropDay, setDropDay] = useState(null);
+    // Touch/Pencil-Drag (iPad): HTML5-DnD feuert auf iOS NICHT — daher via Pointer-Events
+    // nachgebaut. Maus läuft weiter über das native HTML5-DnD (onDragStart/onDrop oben).
+    const dragSuppress = useRef(0); // unterdrückt den Klick (Tagesansicht öffnen) direkt nach einem Drop
+    const dayAtPoint = (x, y) => {
+      const el = document.elementFromPoint(x, y);
+      const col = el && el.closest ? el.closest('.ff-daycol') : null;
+      return col && col.dataset.day != null ? parseInt(col.dataset.day, 10) : null;
+    };
+    const onCardPointerDown = (di, ii, e) => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return; // Maus → natives DnD
+      const st = { x: e.clientX, y: e.clientY, pid: e.pointerId, active: false };
+      const move = (ev) => {
+        if (ev.pointerId !== st.pid) return;
+        if (!st.active) {
+          if (Math.hypot(ev.clientX - st.x, ev.clientY - st.y) < 8) return; // Schwelle: Tippen ≠ Ziehen
+          st.active = true; setDrag({ di, ii });
+        }
+        ev.preventDefault(); // wir besitzen die Geste → kein Scrollen während des Ziehens
+        setDropDay(dayAtPoint(ev.clientX, ev.clientY));
+      };
+      const end = (ev) => {
+        window.removeEventListener('pointermove', move, { passive: false });
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+        if (st.active) {
+          const day = dayAtPoint(ev.clientX, ev.clientY);
+          if (day != null && day !== di) onMove(di, ii, day);
+          dragSuppress.current = Date.now() + 400;
+        }
+        setDrag(null); setDropDay(null);
+      };
+      window.addEventListener('pointermove', move, { passive: false });
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+    };
     const plannedTss = days.reduce((s, d) => s + d.items.reduce((a, it) => a + it.tss, 0), 0);
     const plannedDur = days.reduce((s, d) => s + d.items.reduce((a, it) => a + it.dur, 0), 0);
     const kw = isoWeek(days[0].dateObj);
@@ -282,7 +319,7 @@
             const dayTss = d.items.reduce((s, it) => s + it.tss, 0);
             const isSel = di === selDay;
             return h('div', {
-              key: di, className: 'ff-daycol' + (isSel ? ' is-sel' : '') + (dropDay === di && drag && drag.di !== di ? ' is-drop' : ''),
+              key: di, 'data-day': di, className: 'ff-daycol' + (isSel ? ' is-sel' : '') + (dropDay === di && drag && drag.di !== di ? ' is-drop' : ''),
               onDragOver: (e) => { if (drag) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dropDay !== di) setDropDay(di); } },
               onDrop: (e) => { e.preventDefault(); if (drag && drag.di !== di) onMove(drag.di, drag.ii, di); setDrag(null); setDropDay(null); },
             },
@@ -298,10 +335,12 @@
                 d.items.length === 0 && h('div', { style: { fontSize: 11, color: 'var(--text-4)', textAlign: 'center', padding: '14px 0' } }, 'Ruhetag'),
                 d.items.map((s, ii) => h(SessionCard, {
                   key: ii, s,
-                  onRemove: () => onRemove(di, ii), onAccept: () => onAccept(di, ii), onOpen: () => onSelDay(di),
+                  onRemove: () => onRemove(di, ii), onAccept: () => onAccept(di, ii),
+                  onOpen: () => { if (Date.now() < dragSuppress.current) return; onSelDay(di); },
                   dragging: !!drag && drag.di === di && drag.ii === ii,
                   onDragStart: (e) => { setDrag({ di, ii }); try { e.dataTransfer.setData('text/plain', di + ':' + ii); e.dataTransfer.effectAllowed = 'move'; } catch (_) { /* noop */ } },
                   onDragEnd: () => { setDrag(null); setDropDay(null); },
+                  onPointerDown: (e) => onCardPointerDown(di, ii, e),
                 }))),
               h('button', { className: 'ff-add', onClick: () => onAdd(di) }, h(Icon, { name: 'plus', size: 14 }), 'Einheit'));
           }))),
