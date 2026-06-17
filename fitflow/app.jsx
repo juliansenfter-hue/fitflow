@@ -2,7 +2,7 @@
 (function () {
   const { createElement: h, useState, useEffect, useRef, Fragment } = React;
   const UI = window.UI;
-  const { Shell, Topbar, SportIcon } = UI;
+  const { Shell, Topbar, SportIcon, AnimatedWordmark } = UI;
   const Icon = window.Icon;
   const S = window.Screens;
   const { useTweaks, TweaksPanel, TweakSection, TweakColor,
@@ -86,10 +86,11 @@
     dashboard: { t: 'Dashboard', s: () => `${FF.fmt.dateFull(FF.TODAY)} · Trainingsblock Load · Polarisiert` },
     jahr: { t: 'Jahres Übersicht', s: () => 'Saison 2026 · Periodisierung & Trainingsfokus' },
     prognose: { t: 'Form-Prognose', s: () => 'TSB-Projektion & Taper-Optimierung bis zum Zielwettkampf' },
-    woche: { t: 'Planung', s: () => 'KI-gestützte Wochen- & Tagesplanung' },
+    woche: { t: 'Planung', s: () => 'KI-Empfehlung für die kommende Woche' },
     diag: { t: 'Leistungsdiagnostik', s: () => 'Telemetrie, Trainingsload & Einheiten-Vergleich' },
     import: { t: 'Import & Sync', s: () => 'FIT / CSV Import · Strava · Apple Health' },
-    profil: { t: 'Profil & Zonen', s: () => 'Persönliche Daten, HF- & Leistungszonen' },
+    design: { t: 'Design', s: () => 'Hintergrund, Material & Form der Oberfläche' },
+    profil: { t: 'Profileinstellungen', s: () => 'Persönliche Daten, HF- & Leistungszonen' },
   };
 
   /* =========================================================
@@ -175,7 +176,7 @@
       h(Icon, { name: 'layers', size: 30 }), h('div', { style: { marginTop: 12 } }, `${name} – in Arbeit`));
   }
 
-  function App() {
+  function App({ locked, startTour, onTourDone }) {
     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
     const [route, setRoute] = useState(() => location.hash.replace('#', '') || 'dashboard');
     const [activity, setActivity] = useState(null);
@@ -196,60 +197,48 @@
        approaches and ramps up the closer you get (the gradient falloff +
        per-card --glow-size set how far that reach extends) */
     useEffect(() => {
-      // Touch-/Pencil-Geräte (iPad: pointer coarse): den wandernden Glow NICHT pro
-      // Pointer-Bewegung neu zeichnen — das Repaint der Radial-Gradienten über dem
-      // Milchglas ist dort zu teuer und ruckelt extrem. Am Desktop (Maus) bleibt er aktiv.
-      if ((navigator.maxTouchPoints || 0) > 0 ||
-          (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return;
-      let raf = null, ev = null, cache = null;
-      // Karten-Rechtecke werden gecacht und nur bei Scroll/Resize/DOM-Wechsel neu
-      // gemessen — so kostet jede Pointer-/Pencil-Bewegung nur noch Arithmetik
-      // (kein querySelectorAll und kein getBoundingClientRect pro Frame).
-      const rebuild = () => {
-        cache = [];
-        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
-          cache.push({ el, r: el.getBoundingClientRect() });
-        });
-      };
-      const invalidate = () => { cache = null; };
+      let raf = null, ev = null;
       const apply = () => {
         raf = null;
         if (!ev) return;
-        if (!cache) rebuild();
-        const x = ev.clientX, y = ev.clientY;
-        for (let i = 0; i < cache.length; i++) {
-          const el = cache[i].el, r = cache[i].r;
-          // nur Karten in Reichweite (~340px) bekommen den Glow — ferne bleiben dunkel
-          const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
-          const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
-          if (dx > 340 || dy > 340) { if (el.style.getPropertyValue('--lx')) { el.style.removeProperty('--lx'); el.style.removeProperty('--ly'); } continue; }
-          el.style.setProperty('--lx', (x - r.left).toFixed(1) + 'px');
-          el.style.setProperty('--ly', (y - r.top).toFixed(1) + 'px');
-        }
+        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          // only feed cards the pointer is near (within ~340px) — far cards stay
+          // dark for free (their gradient centre sits off-card) and we skip the work
+          const dx = ev.clientX < r.left ? r.left - ev.clientX : ev.clientX > r.right ? ev.clientX - r.right : 0;
+          const dy = ev.clientY < r.top ? r.top - ev.clientY : ev.clientY > r.bottom ? ev.clientY - r.bottom : 0;
+          if (dx > 340 || dy > 340) { if (el.style.getPropertyValue('--lx')) { el.style.removeProperty('--lx'); el.style.removeProperty('--ly'); } return; }
+          el.style.setProperty('--lx', (ev.clientX - r.left).toFixed(1) + 'px');
+          el.style.setProperty('--ly', (ev.clientY - r.top).toFixed(1) + 'px');
+        });
       };
       const onMove = (e) => { ev = e; if (!raf) raf = requestAnimationFrame(apply); };
       const onLeave = () => {
         ev = null;
-        if (cache) cache.forEach((c) => { c.el.style.removeProperty('--lx'); c.el.style.removeProperty('--ly'); });
+        document.querySelectorAll('.spotlight, .panel, .tile, .ff-topbar').forEach((el) => {
+          el.style.removeProperty('--lx'); el.style.removeProperty('--ly');
+        });
       };
       window.addEventListener('pointermove', onMove, { passive: true });
-      window.addEventListener('scroll', invalidate, { passive: true, capture: true });
-      window.addEventListener('resize', invalidate);
       document.addEventListener('pointerleave', onLeave);
-      const mo = new MutationObserver(invalidate); // Screenwechsel/Layoutänderung → Rechtecke neu messen
-      mo.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
       return () => {
         window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('scroll', invalidate, { capture: true });
-        window.removeEventListener('resize', invalidate);
         document.removeEventListener('pointerleave', onLeave);
-        mo.disconnect();
         if (raf) cancelAnimationFrame(raf);
       };
     }, []);
 
     const nav = (id) => { setActivity(null); setRoute(id); window.scrollTo(0, 0); };
     const openActivity = (id) => { setActivity(id); setRoute('diag'); window.scrollTo(0, 0); };
+
+    /* intro splash: big centred wordmark over the blurred live background,
+       then it flies into the sidebar logo box while all cards stagger in.
+       Plays once when the authenticated app first mounts — never behind the
+       locked login teaser. */
+    const [intro, setIntro] = useState(!locked);
+    // onboarding tour: 'ask' (prompt) → 'run' (spotlight) → null
+    const [tour, setTour] = useState(startTour ? 'ask' : null);
+    const endTour = () => { setTour(null); onTourDone && onTourDone(); };
 
     let screen;
     const props = { onNav: nav, onOpenActivity: openActivity, activity, setActivity,
@@ -260,6 +249,7 @@
     else if (route === 'woche' && S.Wochenplanung) screen = h(S.Wochenplanung, props);
     else if (route === 'diag' && S.Diagnostik) screen = h(S.Diagnostik, props);
     else if (route === 'import' && S.ImportSync) screen = h(S.ImportSync, props);
+    else if (route === 'design' && S.Design) screen = h(S.Design, props);
     else if (route === 'profil' && S.Profil) screen = h(S.Profil, props);
     else screen = h(Placeholder, { name: TITLES[route]?.t || route });
 
@@ -269,6 +259,9 @@
 
     return h(Fragment, null,
       h(Shell, { current: route, onNav: nav, topbar }, screen),
+      intro && h(IntroSplash, { onDone: () => setIntro(false) }),
+      tour === 'ask' && h(TourPrompt, { onStart: () => setTour('run'), onLater: endTour }),
+      tour === 'run' && window.OnboardingTour && h(window.OnboardingTour, { onNav: nav, onFinish: endTour }),
       h(TweaksPanel, { title: 'Tweaks' },
         h(TweakSection, { label: 'Akzentfarbe' }),
         h(TweakColor, { label: 'Primär', value: t.accent, options: ACCENTS, onChange: (v) => setTweak('accent', v) }),
@@ -288,6 +281,78 @@
      Dataset vom Backend. So ist die Nahtstelle End-to-End verdrahtet —
      die Daten betreten die App ausschließlich über die API.
      ========================================================= */
+  /* =========================================================
+     IntroSplash — big centred FitFlow wordmark over the blurred
+     live background; flies into the sidebar logo box while every
+     card / nav item staggers in behind it.
+     ========================================================= */
+  function IntroSplash({ onDone }) {
+    const floatRef = useRef(null);
+    const [fly, setFly] = useState(false);
+    const [settled, setSettled] = useState(false);
+
+    useEffect(() => {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) { onDone(); return; }
+
+      document.body.classList.add('ff-intro-hold');
+
+      /* hold an opaque black cover over everything for the first beat so the
+         background engine's first (jittery) frames settle UNSEEN, then ease
+         the cover away to reveal the calm, blurred backdrop behind the logo. */
+      const tSettle = setTimeout(() => setSettled(true), 1250);
+
+      /* arm a staggered reveal on the cards + nav. `both` fill keeps each
+         element hidden through its delay, then plays as the logo flies in. */
+      const armed = [];
+      const arm = (els, d0, step, dur) => els.forEach((el, i) => {
+        el.style.animation = `ffCardIn ${dur}s cubic-bezier(.2,.8,.2,1) both`;
+        el.style.animationDelay = (d0 + i * step).toFixed(3) + 's';
+        armed.push(el);
+      });
+      const base = 2.65;
+      const tb = document.querySelector('.ff-topbar');
+      if (tb) arm([tb], base - 0.1, 0, 0.6);
+      arm([...document.querySelectorAll('.ff-content > *')], base, 0.07, 0.62);
+      arm([...document.querySelectorAll('.ff-sidebar .ff-nav-list > *, .ff-sidebar .ff-side-foot')], base + 0.18, 0.045, 0.5);
+
+      const tFly = setTimeout(() => {
+        const target = document.querySelector('.ff-sidebar .ff-logo');
+        const fl = floatRef.current;
+        if (target && fl) {
+          const tr = target.getBoundingClientRect();
+          const fr = fl.getBoundingClientRect();
+          const s = tr.width / fr.width;
+          fl.style.setProperty('--fx', (tr.left - fr.left).toFixed(1) + 'px');
+          fl.style.setProperty('--fy', (tr.top - fr.top).toFixed(1) + 'px');
+          fl.style.setProperty('--fs', s.toFixed(4));
+        }
+        setFly(true);
+      }, 2600);
+
+      /* the flight lasts 1.25s; on the exact frame it lands, reveal the real
+         sidebar logo with NO fade — the flying copy is identical and pixel-
+         aligned, so the swap is invisible — then drop the overlay 2 frames
+         later. No crossfade = no brightening / flicker. */
+      const tHandoff = setTimeout(() => document.body.classList.remove('ff-intro-hold'), 3850);
+      const tDone = setTimeout(() => {
+        armed.forEach((el) => { el.style.animation = ''; el.style.animationDelay = ''; });
+        onDone();
+      }, 3885);
+
+      return () => {
+        clearTimeout(tSettle); clearTimeout(tFly); clearTimeout(tHandoff); clearTimeout(tDone);
+        document.body.classList.remove('ff-intro-hold');
+      };
+    }, []);
+
+    return h('div', { className: 'ff-intro' + (settled ? ' is-settled' : '') + (fly ? ' is-fly' : '') },
+      h('div', { className: 'ff-intro-cover' }),
+      h('div', { className: 'ff-intro-scrim' }),
+      h('div', { className: 'ff-intro-logo', ref: floatRef },
+        h(AnimatedWordmark, { text: 'FitFlow', replayKey: 'intro' })));
+  }
+
   function BootSplash({ label }) {
     return h('div', { className: 'ff-boot' },
       h('div', { className: 'ff-boot-mark' }, 'FF'),
@@ -308,19 +373,53 @@
         h('button', { className: 'btn btn--primary btn--sm', onClick: onMock }, 'In den Mock-Modus wechseln')));
   }
 
+  /* welcome prompt shown right after registration */
+  function TourPrompt({ onStart, onLater }) {
+    return h('div', { className: 'ff-tour-prompt-scrim' },
+      h('div', { className: 'ff-tour-prompt' },
+        h('div', { className: 'ff-tour-prompt-mark' }, h(Icon, { name: 'spark', size: 22 })),
+        h('h2', null, 'Willkommen bei FitFlow'),
+        h('p', null, 'Dein Profil ist noch leer. Sollen wir dir in einer kurzen Tour die wichtigsten Bereiche zeigen?'),
+        h('div', { className: 'ff-tour-prompt-btns' },
+          h('button', { className: 'btn btn--ghost', onClick: onLater }, 'Später'),
+          h('button', { className: 'btn btn--primary', onClick: onStart }, h(Icon, { name: 'spark', size: 15 }), 'Tour starten'))));
+  }
+
   function Root() {
     const API = window.FitFlowAPI;
+    const Auth = window.FFAuth;
+    const Acct = window.FFAccount;
     const [phase, setPhase] = useState(API ? 'loading' : 'ready'); // loading | ready | error
     const [err, setErr] = useState(null);
+    const [authed, setAuthed] = useState(Auth ? Auth.isLoggedIn() : true);
+    const [, bump] = useState(0);
+    const [tour, setTour] = useState(false);
     const run = () => {
       if (!API) { setPhase('ready'); return; }
       setPhase('loading'); setErr(null);
       API.bootstrap().then(() => setPhase('ready')).catch((e) => { setErr(e); setPhase('error'); });
     };
     useEffect(run, []);
+    useEffect(() => {
+      if (!Auth) return;
+      // bump on every auth change (login/logout AND markOnboarded) so Root
+      // re-applies the active account's dataset and the screen swaps.
+      return Auth.subscribe((s) => { setAuthed(!!s.loggedIn); bump((n) => n + 1); });
+    }, []);
     if (phase === 'loading') return h(BootSplash, { label: API && API.mode === 'live' ? 'Mit Backend verbinden …' : 'Daten werden geladen …' });
     if (phase === 'error') return h(BootError, { err, onRetry: run, onMock: () => { API.useMock(); run(); } });
-    return h(App);
+    // gated: blurred dashboard teaser (always demo data) behind the login card
+    if (Auth && !authed) {
+      if (Acct) Acct.apply(false, null);
+      const Login = window.LoginScreen;
+      return h(Fragment, null,
+        h('div', { className: 'ff-applocked', 'aria-hidden': true, inert: '' }, h(App, { locked: true })),
+        Login ? h(Login, { onSuccess: (res) => { setTour(!!(res && res.registered)); setAuthed(true); } }) : null);
+    }
+    // authed: load the active account's dataset (demo = full, registered = empty)
+    if (Acct) Acct.apply(Auth ? Auth.isEmptyAccount() : false, Auth ? Auth.currentAccount() : null);
+    const acc = Auth ? Auth.currentAccount() : null;
+    return h(App, { key: acc ? acc.email : 'live', startTour: tour, onTourDone: () => setTour(false) });
   }
 
   ReactDOM.createRoot(document.getElementById('root')).render(h(Root));

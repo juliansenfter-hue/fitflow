@@ -1,7 +1,7 @@
 /* FitFlow — Jahresplanung (annual periodization) */
 (function () {
   const { createElement: h, useState, useEffect, Fragment } = React;
-  const { Card, Stat, Tabs, AiInsight } = window.UI;
+  const { Card, Stat, Tabs, AiInsight, EmptyState } = window.UI;
   const C = window.Charts;
   const Icon = window.Icon;
   const fmt = FF.fmt;
@@ -305,6 +305,9 @@
   }
 
   function Jahresplanung({ onNav }) {
+    if (FF.empty) return h(EmptyState, { icon: 'calendar', title: 'Noch keine Jahresplanung',
+      body: 'Lege Saisonziele und Wettkämpfe an, sobald dein Profil eingerichtet ist. Verbinde zuerst einen Dienst oder fülle dein Profil aus.',
+      cta: 'Profil ausfüllen', onCta: () => onNav && onNav('profil') });
     const an = FF.annual;
     const saved = loadSavedPlan();
     const [loadMode, setLoadMode] = useState(saved ? saved.loadMode || 'ai' : 'ai');     // 'ai' = KI-Vorschlag · 'manual' = selbst planen

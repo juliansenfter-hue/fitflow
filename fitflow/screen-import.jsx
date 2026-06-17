@@ -133,7 +133,7 @@
                 : h('span', { className: 'row center gap-5', style: { fontSize: 11, color: 'var(--good)', fontWeight: 600 } }, h(Icon, { name: 'check', size: 13 }), 'Importiert'))))) ),
 
       h('div', { className: 'col gap-18' },
-        h(Card, { title: 'Integrationen', icon: 'link' },
+        h(Card, { title: 'Integrationen', icon: 'link', tour: 'integrations' },
           h('div', { className: 'col gap-12' }, integrations.map((it) => h(Integration, { key: it.id, it, busy: busy === it.id, onToggle: () => toggle(it.id) })))),
         h(Card, { title: 'Synchronisierte Daten', icon: 'refresh' },
           h('div', { className: 'col gap-10' },

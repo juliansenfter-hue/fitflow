@@ -4,7 +4,7 @@
    The competition shows the past — this shows (and shapes) the future. */
 (function () {
   const { createElement: h, useState, useMemo, useEffect, useRef, Fragment } = React;
-  const { Card, Tabs, AiInsight } = window.UI;
+  const { Card, Tabs, AiInsight, EmptyState } = window.UI;
   const Icon = window.Icon;
   const fmt = FF.fmt;
 
@@ -14,11 +14,11 @@
   const SHAPE = [0.06, 0.20, 0.09, 0.18, 0.05, 0.24, 0.18];
   const climbDaily = (3 / 7) / kC; // daily TSS-over-CTL that pulls ~+3 CTL / week
 
-  /* Ziel-Wettkämpfe — feste Kalenderdaten; Tages-Offset & Label leiten sich aus dem realen TODAY ab */
+  /* target events, day-offsets measured from TODAY (06 Jun 2026) */
   const EVENTS = [
-    { id: 'otz', name: 'Ötztaler Radmarathon', short: 'Ötztaler', type: 'A', sport: 'bike', dist: '227 km · 5 500 hm', date: new Date(2026, 7, 29) },
-    { id: 'wachau', name: 'Wachau Halbmarathon', short: 'Wachau', type: 'B', sport: 'run', dist: '21,1 km', date: new Date(2026, 9, 12) },
-  ].map((e) => ({ ...e, offset: Math.round((e.date - FF.TODAY) / 86400000), dateLbl: `${e.date.getDate()}. ${FF.months[e.date.getMonth()]}` }));
+    { id: 'otz', name: 'Ötztaler Radmarathon', short: 'Ötztaler', type: 'A', offset: 84, sport: 'bike', dist: '227 km · 5 500 hm', dateLbl: '29. Aug' },
+    { id: 'wachau', name: 'Wachau Halbmarathon', short: 'Wachau', type: 'B', offset: 128, sport: 'run', dist: '21,1 km', dateLbl: '12. Okt' },
+  ];
 
   /* ---- pure forward simulation ---- */
   function project(start, raceOffset, peakCtl, taperWeeks, taperDrop, tail) {
@@ -268,7 +268,10 @@
   /* =========================================================
      Screen
      ========================================================= */
-  function Prognose() {
+  function Prognose({ onNav }) {
+    if (FF.empty) return h(EmptyState, { icon: 'forecast', title: 'Keine Prognose verfügbar',
+      body: 'Die Form- und Leistungsprognose braucht deine aktuelle Fitness (CTL/ATL). Verbinde einen Dienst oder importiere Aktivitäten, um zu starten.',
+      cta: 'Dienst verbinden', onCta: () => onNav && onNav('import') });
     const start = { ctl: FF.todayLoad.ctl, atl: FF.todayLoad.atl };
     const [evId, setEvId] = useState('otz');
     const [mode, setMode] = useState('ai');           // 'ai' | 'manual'

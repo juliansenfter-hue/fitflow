@@ -14,10 +14,6 @@
    "Hintergrund" section of the Tweaks panel via window.FFBackground.
    ============================================================ */
 (function () {
-  // Touch-Gerät zuverlässig markieren: navigator.maxTouchPoints wird – anders als die
-  // CSS-Media-Features pointer/any-pointer – vom iPad-Safari-Desktop-Modus NICHT verfälscht.
-  // Die Klasse .is-touch lässt die iPad-Layout-Regeln (styles.css) auch im Querformat greifen.
-  try { if ((navigator.maxTouchPoints || 0) > 0) document.documentElement.classList.add('is-touch'); } catch (e) { /* noop */ }
   const KEY = 'ff-bg-v3';
 
   /* curated colour presets — the four the user asked for */
@@ -50,11 +46,20 @@
     intensity: 55,      // overall strength (→ layer opacity), 30–100
     bars: 15,           // bar count (bars mode)
     photo: null,        // custom uploaded background (data URL); null → scenic default
+    photoScale: 1,      // zoom factor for photo (1–3)
+    photoX: 50,         // horizontal focus / crop, 0–100 %
+    photoY: 50,         // vertical focus / crop, 0–100 %
   };
 
   let S = Object.assign({}, DEFAULTS);
   const subs = new Set();
-  let root = null, cleanup = null;
+  let root = null, cleanup = null, photoEl = null;
+
+  function applyPhotoTransform() {
+    if (!photoEl) return;
+    photoEl.style.backgroundPosition = `${S.photoX}% ${S.photoY}%`;
+    photoEl.style.backgroundSize = `${Math.round(S.photoScale * 100)}%`;
+  }
 
   /* ---- colour helpers ---- */
   function hexToRgb(hex) {
@@ -185,12 +190,7 @@
     }
     resize();
     window.addEventListener('resize', resize);
-    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
-    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
-    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
-    const reduced = window.matchMedia && (
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-      window.matchMedia('(pointer: coarse)').matches);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduced) { frame(false); }
     else {
       let last = 0;
@@ -237,12 +237,7 @@
 
     const hueEl = svg.querySelector('.hue');
     let raf = null;
-    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
-    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
-    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
-    const reduced = window.matchMedia && (
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-      window.matchMedia('(pointer: coarse)').matches);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduced && hueEl) {
       let v = 0, last = 0;
       (function loop(t) {
@@ -291,12 +286,7 @@
      ============================================================ */
   function buildPaths() {
     const c = S.color;
-    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
-    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
-    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
-    const reduced = window.matchMedia && (
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-      window.matchMedia('(pointer: coarse)').matches);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', '0 0 696 316');
@@ -352,10 +342,12 @@
   function buildPhoto() {
     const img = document.createElement('div');
     img.style.cssText =
-      `position:absolute;inset:0;` +
-      `background:#0a0d14 url("${S.photo || PHOTO_URL}") center / cover no-repeat;`;
+      `position:absolute;inset:0;background-color:#0a0d14;` +
+      `background-image:url("${S.photo || PHOTO_URL}");background-repeat:no-repeat;` +
+      `background-position:${S.photoX}% ${S.photoY}%;background-size:${Math.round(S.photoScale * 100)}%;`;
     root.appendChild(img);
-    return null;
+    photoEl = img;
+    return () => { photoEl = null; };
   }
 
   /* ---- one-time keyframes ---- */
@@ -386,14 +378,6 @@
     applyIntensity();
   }
 
-  // strukturelle Änderungen (z. B. Balkenanzahl) bauen den Hintergrund komplett neu —
-  // beim Regler-Ziehen auf höchstens 1×/Frame drosseln.
-  let renderRaf = 0;
-  function renderSoon() {
-    if (renderRaf) return;
-    renderRaf = requestAnimationFrame(() => { renderRaf = 0; render(); });
-  }
-
   function init() {
     try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch (e) {}
     render();
@@ -408,8 +392,9 @@
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
       // intensity-only change → just fade, no costly rebuild
       const structural = ['mode', 'color', 'solidColor', 'bars', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
-      if (!root) render();
-      else if (structural) renderSoon();   // teuren Rebuild auf 1×/Frame drosseln
+      const photoXform = ['photoScale', 'photoX', 'photoY'].some((k) => k in partial && partial[k] !== prev[k]);
+      if (structural || !root) render();
+      else if (photoXform && photoEl) applyPhotoTransform();
       else applyIntensity();
       subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
     },

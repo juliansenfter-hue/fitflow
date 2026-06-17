@@ -146,15 +146,6 @@
     document.querySelectorAll(GLASS_SEL).forEach(styleEl);
   }
 
-  // styleEl auf allen Glas-Boxen ist teuer (SVG-Filter + backdrop-filter-Recomposite).
-  // Beim Regler-Ziehen feuert set() pro pointermove — daher den teuren Sweep auf
-  // höchstens 1×/Frame drosseln (die billigen CSS-Variablen via applyVars bleiben live).
-  let styleRaf = 0;
-  function styleAllSoon() {
-    if (styleRaf) return;
-    styleRaf = requestAnimationFrame(() => { styleRaf = 0; document.querySelectorAll(GLASS_SEL).forEach(styleEl); });
-  }
-
   /* ---- observers: keep filters sized to live panels + tiles ---- */
   const ro = new ResizeObserver((entries) => { entries.forEach((e) => styleEl(e.target)); });
   let scanT = null;
@@ -202,8 +193,7 @@
     set(partial) {
       S = Object.assign({}, S, partial);
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
-      applyVars();        // billige CSS-Variablen sofort anwenden
-      styleAllSoon();     // teures Neu-Stylen aller Glas-Boxen gedrosselt (1×/Frame)
+      refreshAll();
       subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
     },
     reset() { this.set(Object.assign({}, DEFAULTS)); },

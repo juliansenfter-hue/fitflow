@@ -8,6 +8,7 @@
 
   const Live = {
     notifications: (window.FF && FF.notifications ? FF.notifications.slice() : []),
+    emptyMode: false,
 
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
 
@@ -32,6 +33,8 @@
     },
 
     addActivity(a) { FF.activities.unshift(a); emit(); return a; },
+
+    touch() { emit(); },
 
     /* hydrate: vom Live-Backend gelieferte Daten in den Store übernehmen
        (FitFlowAPI.bootstrap ruft das im Live-Modus auf). Im Mock-Modus
@@ -77,13 +80,17 @@
     try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; }
   }
   function savePersisted() {
+    if (Live.emptyMode) return; // a fresh/empty account never overwrites demo state
     const out = {};
     Live.integrations.forEach((it) => { out[it.id] = { status: it.status, lastSync: it.lastSync, syncedCount: it.syncedCount }; });
     try { localStorage.setItem(LS_KEY, JSON.stringify(out)); } catch (e) { /* noop */ }
   }
 
+  // demo seed kept so we can restore after an empty-account session
+  const DEMO_NOTIFS = (window.FF && FF.notifications ? FF.notifications.slice() : []);
+
   // seed integrations from FF.integrations, overlaid with persisted state
-  (function initIntegrations() {
+  function initIntegrations() {
     const saved = loadPersisted();
     const seed = (window.FF && FF.integrations ? FF.integrations : []);
     Live.integrations = seed.map((it) => {
@@ -96,7 +103,23 @@
         syncedCount: s.syncedCount != null ? s.syncedCount : (it.id === 'strava' && connected ? 212 : 0),
       };
     });
-  })();
+  }
+  initIntegrations();
+
+  /* toggle empty-account mode: all services disconnected + no notifications,
+     and nothing persists; restoring re-seeds the demo state.
+     NOTE: does NOT emit — it's called from Root's render via account.apply(),
+     and the surrounding React render already repaints the tree. */
+  Live.setEmptyMode = (empty) => {
+    Live.emptyMode = !!empty;
+    if (empty) {
+      Live.integrations.forEach((it) => { it.status = 'available'; it.lastSync = null; it.syncedCount = 0; });
+      Live.notifications = [];
+    } else {
+      initIntegrations();
+      Live.notifications = DEMO_NOTIFS.slice();
+    }
+  };
 
   Live.getIntegration = (id) => Live.integrations.find((x) => x.id === id);
 

@@ -65,8 +65,8 @@
   }
 
   /* ---- Card / panel ---- */
-  function Card({ title, icon, right, children, pad = true, className = '', style, glow, spotlight, info }) {
-    return h('section', { className: `panel ${className}${spotlight ? ' spotlight' : ''}`, style: { ...style, ...(spotlight ? { '--glow-color': spotlight } : {}), ...(glow ? { boxShadow: 'inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px var(--accent-soft), 0 24px 60px -36px rgba(0,0,0,.8)' } : {}) } },
+  function Card({ title, icon, right, children, pad = true, className = '', style, glow, spotlight, info, tour }) {
+    return h('section', { className: `panel ${className}${spotlight ? ' spotlight' : ''}`, 'data-tour': tour, style: { ...style, ...(spotlight ? { '--glow-color': spotlight } : {}), ...(glow ? { boxShadow: 'inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px var(--accent-soft), 0 24px 60px -36px rgba(0,0,0,.8)' } : {}) } },
       (title || right) && h('div', { className: 'panel-head', style: { padding: pad ? '20px 24px 0' : '20px 24px 16px', marginBottom: pad ? 0 : 0 } },
         h('div', { className: 'h3' },
           icon && h(Icon, { name: icon, size: 17, style: { color: 'var(--text-3)' } }),
@@ -98,6 +98,17 @@
         h('div', { style: { fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' } }, children)));
   }
 
+  /* ---- full-screen empty state (for data screens before any data) ---- */
+  function EmptyState({ icon = 'spark', title, body, cta, onCta, cta2, onCta2 }) {
+    return h('div', { className: 'ff-emptyscreen' },
+      h('span', { className: 'ff-emptyscreen-ic' }, h(Icon, { name: icon, size: 30 })),
+      h('h2', null, title),
+      body && h('p', null, body),
+      (cta || cta2) && h('div', { className: 'row center gap-10', style: { marginTop: 6 } },
+        cta && h('button', { className: 'btn btn--primary', onClick: onCta }, cta),
+        cta2 && h('button', { className: 'btn btn--outline', onClick: onCta2 }, cta2)));
+  }
+
   /* =========================================================
      NAV + SHELL
      ========================================================= */
@@ -113,7 +124,7 @@
     ] },
     { group: 'Daten', items: [
       { id: 'import', label: 'Import & Sync', icon: 'import' },
-      { id: 'profil', label: 'Profil & Zonen', icon: 'profile' },
+      { id: 'design', label: 'Design', icon: 'palette' },
     ] },
   ];
 
@@ -173,7 +184,7 @@
         h('rect', { x: 4, y: 2, width: 116, height: 116, rx: 30, fill: `url(#${uid}-tint)` }),
         h('rect', { x: 4, y: 2, width: 116, height: 116, rx: 30, fill: '#0c0e16', opacity: '.34' }),
         // the F — chrome fill + wobble, then specular sweep on top
-        h('g', { filter: `url(#${uid}-liquid)`, transform: 'skewX(-5)', transformOrigin: '62 60' },
+        h('g', { filter: `url(#${uid}-liquid)`, transform: 'skewX(-5)', style: { transformOrigin: '62px 60px' } },
           h('path', { d: FPATH, fill: `url(#${uid}-metal)` }),
           h('path', { d: FPATH, fill: `url(#${uid}-sheen)` }),
           h('path', { d: FPATH, fill: 'none', stroke: '#fff', strokeOpacity: '.22', strokeWidth: 1 })),
@@ -207,21 +218,34 @@
           h('div', { className: 'label', style: { padding: '0 14px 8px' } }, grp.group),
           grp.items.map((it) => h(NavItem, { key: it.id, item: it, active: current === it.id, onClick: () => onNav(it.id) }))))),
       h('div', { className: 'ff-side-foot' },
-        h('div', { className: 'row center gap-10', style: { padding: 10, borderRadius: 12, background: 'var(--panel-2)', border: '1px solid var(--line)' } },
+        h('button', { className: 'ff-profile-btn' + (current === 'profil' ? ' is-active' : ''), onClick: () => onNav('profil'), title: 'Profileinstellungen' },
           h(Avatar, { initials: a.initials, size: 36 }),
-          h('div', { className: 'col', style: { lineHeight: 1.25, minWidth: 0 } },
+          h('div', { className: 'col', style: { lineHeight: 1.25, minWidth: 0, flex: 1, textAlign: 'left' } },
             h('div', { className: 'row center gap-6' },
-              h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, a.name),
+              h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, a.name),
               h('span', { style: { fontSize: 9.5, fontWeight: 600, letterSpacing: '.02em', color: 'var(--accent-bright)', background: 'var(--accent-soft)', padding: '2px 7px', borderRadius: 99 } }, a.plan)),
             h('span', { style: { fontSize: 11, color: 'var(--text-3)' } }, 'Athlet')))));
   }
 
   function Topbar({ title, sub, onMenu, children }) {
     const ref = useRef(null);
-    // Hinweis: Die eigene Maus-Verfolgung der Topbar (--mx/--my/--shine) wurde entfernt —
-    // sie speiste nur das deaktivierte .ff-topbar-shine (display:none) und lief ungedrosselt
-    // bei jeder Bewegung. Der sichtbare Rand-Glow der Topbar kommt ohnehin über --lx/--ly
-    // aus dem zentralen Spotlight-Tracker (app.jsx), der .ff-topbar mitführt.
+    useEffect(() => {
+      const onMove = (e) => {
+        const el = ref.current; if (!el) return;
+        const r = el.getBoundingClientRect();
+        // nearest point on the bar to the cursor → glow rides the closest edge
+        const cx = Math.max(r.left, Math.min(e.clientX, r.right));
+        const cy = Math.max(r.top, Math.min(e.clientY, r.bottom));
+        const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+        const THRESH = 150; // how near you must come before it lights up
+        const op = dist <= 0 ? 1 : Math.max(0, 1 - dist / THRESH);
+        el.style.setProperty('--mx', (cx - r.left) + 'px');
+        el.style.setProperty('--my', (cy - r.top) + 'px');
+        el.style.setProperty('--shine', op.toFixed(3));
+      };
+      window.addEventListener('mousemove', onMove);
+      return () => window.removeEventListener('mousemove', onMove);
+    }, []);
     return h('header', { className: 'ff-topbar', ref: ref },
       h('div', { className: 'ff-topbar-shine' }),
       h('div', { className: 'row center gap-14', style: { minWidth: 0, position: 'relative', zIndex: 1 } },
@@ -244,5 +268,5 @@
         h('div', { className: 'ff-content', key: current === 'dashboard' ? 'dashboard' : 'inner' }, children)));
   }
 
-  window.UI = { Shell, Topbar, Sidebar, Card, Stat, Avatar, SportIcon, SportTag, Delta, Tabs, AiInsight, SPORT, NAV };
+  window.UI = { Shell, Topbar, Sidebar, Card, Stat, Avatar, SportIcon, SportTag, Delta, Tabs, AiInsight, AnimatedWordmark, LiquidF, EmptyState, SPORT, NAV };
 })();

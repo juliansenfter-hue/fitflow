@@ -515,7 +515,77 @@
         })));
   }
 
-  function Dashboard({ onOpenActivity, onNav, modules }) {
+  /* ============================================================
+     EMPTY DASHBOARD — shown for a freshly registered (empty) account.
+     A guided onboarding checklist (no Morgen-Check — that lives on the full
+     dashboard). Steps tick off live; when all are done the full dashboard opens.
+     Carries data-tour anchors for the onboarding tour.
+     ============================================================ */
+  function StepRow({ n, step, onNav }) {
+    return h('div', { className: 'ff-ob-step' + (step.done ? ' is-done' : '') },
+      h('span', { className: 'ff-ob-check' },
+        step.done ? h(Icon, { name: 'check', size: 16 }) : h('span', { className: 'ff-ob-num' }, n)),
+      h('span', { className: 'ff-ob-ic' }, h(Icon, { name: step.icon, size: 18 })),
+      h('span', { className: 'col gap-1', style: { flex: 1, minWidth: 0 } },
+        h('span', { className: 'ff-ob-title' }, step.t),
+        h('span', { className: 'ff-ob-desc' }, step.d)),
+      step.done
+        ? h('span', { className: 'ff-ob-badge' }, h(Icon, { name: 'check', size: 12 }), 'Erledigt')
+        : h('button', { className: 'btn btn--outline btn--sm', onClick: () => onNav(step.go) }, step.cta, h(Icon, { name: 'chevR', size: 14 })));
+  }
+
+  function EmptyDashboard({ onNav, onOnboarded, name }) {
+    const a = FF.athlete;
+    const Live = window.FFLive;
+    const profileDone = !!(a.age && a.height && a.weight);
+    const serviceDone = !!(Live && Live.integrations && Live.integrations.some((i) => i.status === 'connected'));
+    const activitiesDone = !!(FF.activities && FF.activities.length > 0);
+    const steps = [
+      { key: 'profil', icon: 'profile', t: 'Profil vervollständigen', d: 'Alter, Größe, Gewicht & Schwellenwerte hinterlegen', done: profileDone, go: 'profil', cta: 'Profil öffnen' },
+      { key: 'dienst', icon: 'link', t: 'Dienst verbinden', d: 'Strava, Garmin, Wahoo oder Apple Health', done: serviceDone, go: 'import', cta: 'Verbinden' },
+      { key: 'import', icon: 'upload', t: 'Aktivitäten importieren', d: 'Per Sync oder FIT-/CSV-Datei hochladen', done: activitiesDone, go: 'import', cta: 'Importieren' },
+    ];
+    const doneCount = steps.filter((s) => s.done).length;
+    const allDone = doneCount === steps.length;
+    const pct = Math.round((doneCount / steps.length) * 100);
+
+    return h('div', { className: 'ff-ob-wrap' },
+      h('section', { className: 'panel ff-ob-card', 'data-tour': 'onboarding' },
+        h('div', { className: 'panel-pad col gap-20' },
+          h('div', { className: 'col gap-7' },
+            h('span', { className: 'chip chip--solid', style: { alignSelf: 'flex-start' } }, h(Icon, { name: 'spark', size: 12 }), 'Erste Schritte'),
+            h('h2', { className: 'metric', style: { fontSize: 30, lineHeight: 1.05, margin: '4px 0 0' } }, `Willkommen, ${name || 'Athlet'}.`),
+            h('p', { style: { fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5, margin: 0, maxWidth: 520 } },
+              'Schließe diese drei Schritte ab — dann erwacht dein Dashboard mit Morgen-Check, Belastungsrisiko und Form-Analyse zum Leben.')),
+
+          h('div', { className: 'col gap-9' },
+            h('div', { className: 'row between center' },
+              h('span', { className: 'label' }, 'Fortschritt'),
+              h('span', { className: 'mono', style: { fontSize: 12, color: 'var(--text-2)' } }, `${doneCount} / ${steps.length} erledigt`)),
+            h('div', { className: 'ff-ob-bar' }, h('div', { className: 'ff-ob-bar-fill', style: { width: pct + '%' } }))),
+
+          h('div', { className: 'col gap-10' }, steps.map((s, i) => h(StepRow, { key: s.key, n: i + 1, step: s, onNav }))),
+
+          allDone
+            ? h('div', { className: 'ff-ob-done' },
+                h('span', { className: 'ff-ob-done-ic' }, h(Icon, { name: 'check', size: 22 })),
+                h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
+                  h('span', { className: 'strong', style: { fontSize: 15, fontWeight: 700 } }, 'Alles startklar!'),
+                  h('span', { style: { fontSize: 12.5, color: 'var(--text-2)' } }, 'Dein vollständiges Dashboard steht bereit.')),
+                h('button', { className: 'btn btn--primary', onClick: () => { window.FFAuth && window.FFAuth.markOnboarded(); onOnboarded && onOnboarded(); } },
+                  'Dashboard öffnen', h(Icon, { name: 'chevR', size: 15 })))
+            : h('p', { className: 'ff-ob-hint' }, h(Icon, { name: 'info', size: 14 }),
+                h('span', null, 'Sobald alle Schritte erledigt sind, öffnet sich dein persönliches Dashboard automatisch.')))));
+  }
+
+  function Dashboard({ onOpenActivity, onNav, onOnboarded, modules }) {
+    // Choose empty vs full WITHOUT calling either's hooks here, so the hook
+    // order stays stable across the empty→full transition.
+    if (FF.empty) return h(EmptyDashboard, { onNav, onOnboarded, name: FF.athlete.name });
+    return h(FullDashboard, { onOpenActivity, onNav, modules });
+  }
+
+  function FullDashboard({ onOpenActivity, onNav, modules }) {
     const mods = modules || { checkin: true, risk: true, sim: true };
     const rec = FF.recovery, reco = FF.reco, w = FF.week, tl = FF.todayLoad;
     const [heroView, setHeroView] = useState('reco');
@@ -555,13 +625,13 @@
           mods.risk && h(RiskBar, { risk: FF.risk }))),
 
       /* ---------- FORM / FITNESS ROW ---------- */
-      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 } },
         h(FormFitnessCard, { onNav, allowSim: mods.sim }),
         /* Weekly rhythm */
         h(WochenrhythmusCard, null)),
 
       /* ---------- WEEKLY GOALS + ACTIVITIES ---------- */
-      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 } },
         h(Card, { title: 'Wochenziele', icon: 'target',
           right: h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--z4)' } }), w.focus) },
           /* four animated liquid-mesh orbs — same soul as the Recovery Score */
@@ -792,14 +862,14 @@
       h(SportIcon, { sport: a.sport, size: 38, soft: true }),
       h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
         h('div', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, a.title),
-        h('div', { className: 'row center gap-8', style: { fontSize: 11.5, color: 'var(--text-3)', flexWrap: 'wrap', rowGap: 2 } },
+        h('div', { className: 'row center gap-8', style: { fontSize: 11.5, color: 'var(--text-3)' } },
           h('span', null, FF.fmt.date(a.date)),
           h('span', null, '·'), h('span', { className: 'mono' }, FF.fmt.dur(a.duration)),
           a.distance && h(Fragment, null, h('span', null, '·'), h('span', { className: 'mono' }, `${FF.fmt.n(a.distance, 1)} km`)))),
-      h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4, flexShrink: 0 } },
+      h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4 } },
         h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss),
         h('span', { className: 'label', style: { fontSize: 8.5 } }, 'TSS')),
-      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
+      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})` } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
   }
 
   window.Screens = window.Screens || {};

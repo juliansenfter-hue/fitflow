@@ -1,7 +1,7 @@
 /* FitFlow — Leistungsdiagnostik (telemetry, load, comparison) */
 (function () {
   const { createElement: h, useState, useMemo, Fragment } = React;
-  const { Card, Stat, Tabs, AiInsight, SportIcon } = window.UI;
+  const { Card, Stat, Tabs, AiInsight, SportIcon, EmptyState } = window.UI;
   const C = window.Charts;
   const Icon = window.Icon;
   const SPORT = window.UI.SPORT;
@@ -102,7 +102,10 @@
       }));
   }
 
-  function Diagnostik({ activity, setActivity }) {
+  function Diagnostik({ activity, setActivity, onNav }) {
+    if (FF.empty) return h(EmptyState, { icon: 'activity', title: 'Noch keine Diagnostik-Daten',
+      body: 'Importiere eine Aktivität mit Herzfrequenz-, Power- oder Pace-Daten, um Leistungs- und Einheiten-Analysen zu sehen.',
+      cta: 'Aktivität importieren', onCta: () => onNav && onNav('import') });
     const [mode, setMode] = useState('einheiten'); // einheiten | load
     const [filter, setFilter] = useState('all');
     const [compare, setCompare] = useState(false);

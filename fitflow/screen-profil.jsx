@@ -19,20 +19,18 @@
         zones.map((z, i) => h('div', { key: i, title: z.name, style: { flex: z.hi - z.lo || 0.2, background: `var(--${z.color})` } }))),
       h('div', { className: 'col gap-1' }, zones.map((z, i) => {
         const lo = z[deriveKey + 'Lo'], hi = z[deriveKey + 'Hi'];
+        const range = (isNaN(lo) || isNaN(hi)) ? '—' : `${lo}–${hi} ${unit}`;
         return h('div', { key: i, className: 'ff-zrow' },
           h('span', { className: 'mono', style: { width: 26, color: `var(--${z.color})`, fontWeight: 700, fontSize: 12 } }, z.z),
           h('span', { className: 'strong', style: { flex: 1, fontSize: 12.5, fontWeight: 500 } }, z.name),
           h('span', { className: 'label', style: { color: 'var(--text-4)', whiteSpace: 'nowrap', flexShrink: 0 } }, `${Math.round(z.lo * 100)}–${Math.round(z.hi * 100)}%`),
-          h('span', { className: 'mono', style: { width: 100, textAlign: 'right', fontSize: 12.5, color: 'var(--text-2)', whiteSpace: 'nowrap', flexShrink: 0 } }, `${lo}–${hi} ${unit}`));
+          h('span', { className: 'mono', style: { width: 100, textAlign: 'right', fontSize: 12.5, color: 'var(--text-2)', whiteSpace: 'nowrap', flexShrink: 0 } }, range));
       })));
   }
 
   function Profil() {
-    const [tab, setTab] = useState('settings');
-    const tabRow = h('div', { className: 'ff-glasstabs', style: { marginBottom: 20 } },
-      [['settings', 'Einstellungen'], ['design', 'Design']].map(([v, l]) =>
-        h('button', { key: v, className: 'ff-glasstab' + (tab === v ? ' is-active' : ''), onClick: () => setTab(v) }, l)));
     const a = FF.athlete;
+    const empty = !!FF.empty;
     const [p, setP] = useState({ name: a.name, age: a.age, height: a.height, weight: a.weight, sex: a.sex });
     const [thrHr, setThrHr] = useState(a.thrHr);
     const [maxHr, setMaxHr] = useState(a.maxHr);
@@ -41,16 +39,23 @@
     const [avatar, setAvatar] = useState(null);
     const fileRef = useRef(null);
 
-    const hrZones = FF.hrZones.map((z) => ({ ...z, bpmLo: Math.max(restHr, Math.round(z.lo * thrHr)), bpmHi: Math.round(z.hi * thrHr) }));
-    const pwZones = FF.powerZones.map((z) => ({ ...z, wLo: Math.round(z.lo * ftp), wHi: Math.round(z.hi * ftp) }));
-    const bmi = (p.weight / Math.pow(p.height / 100, 2)).toFixed(1);
-    const wkg = (ftp / p.weight).toFixed(2);
+    const num = (v) => (v === '' || v == null || isNaN(v)) ? '—' : v;
+    // keep the global athlete record in sync so the onboarding checklist on the
+    // dashboard (and zone derivations elsewhere) reflect what's entered here.
+    useEffect(() => {
+      Object.assign(FF.athlete, { name: p.name, age: p.age, height: p.height, weight: p.weight, sex: p.sex, thrHr, maxHr, restHr, ftp });
+      if (thrHr && ftp) FF.zonesSet = true;
+    }, [p, thrHr, maxHr, restHr, ftp]);
+    const hrZones = FF.hrZones.map((z) => ({ ...z, bpmLo: thrHr ? Math.max(restHr || 0, Math.round(z.lo * thrHr)) : NaN, bpmHi: thrHr ? Math.round(z.hi * thrHr) : NaN }));
+    const pwZones = FF.powerZones.map((z) => ({ ...z, wLo: ftp ? Math.round(z.lo * ftp) : NaN, wHi: ftp ? Math.round(z.hi * ftp) : NaN }));
+    const bmi = (p.weight && p.height) ? (p.weight / Math.pow(p.height / 100, 2)).toFixed(1) : '—';
+    const wkg = (ftp && p.weight) ? (ftp / p.weight).toFixed(2) : '—';
 
     const onAvatar = (e) => { const f = e.target.files[0]; if (f) { const url = URL.createObjectURL(f); setAvatar(url); } };
 
-    const settingsView = h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.3fr)', gap: 18, alignItems: 'start' }, 'data-prof': true },
-      /* profile */
-      h('div', { className: 'col gap-18' },
+    const settingsView = h('div', { className: 'col gap-18', 'data-prof': true },
+      /* row 1: Athletenprofil + Konto */
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: '1fr 1fr', gap: 18, alignItems: 'stretch' } },
         h(Card, { title: 'Athletenprofil', icon: 'profile' },
           h('div', { className: 'row center gap-16', style: { marginBottom: 20 } },
             h('div', { style: { position: 'relative' } },
@@ -66,20 +71,18 @@
           h('div', { className: 'col gap-12' },
             h(Field, { label: 'Profilname' }, h('input', { className: 'ff-input', value: p.name, onChange: (e) => setP({ ...p, name: e.target.value }) })),
             h('div', { className: 'ff-grid grid-3', style: { gap: 12 } },
-              h(Field, { label: 'Alter', suffix: 'J' }, h('input', { type: 'number', className: 'ff-input', value: p.age, onChange: (e) => setP({ ...p, age: +e.target.value }) })),
-              h(Field, { label: 'Größe', suffix: 'cm' }, h('input', { type: 'number', className: 'ff-input', value: p.height, onChange: (e) => setP({ ...p, height: +e.target.value }) })),
-              h(Field, { label: 'Gewicht', suffix: 'kg' }, h('input', { type: 'number', step: '0.1', className: 'ff-input', value: p.weight, onChange: (e) => setP({ ...p, weight: +e.target.value }) }))),
+              h(Field, { label: 'Alter', suffix: 'J' }, h('input', { type: 'number', className: 'ff-input', value: p.age, onChange: (e) => setP({ ...p, age: e.target.value === '' ? '' : +e.target.value }) })),
+              h(Field, { label: 'Größe', suffix: 'cm' }, h('input', { type: 'number', className: 'ff-input', value: p.height, onChange: (e) => setP({ ...p, height: e.target.value === '' ? '' : +e.target.value }) })),
+              h(Field, { label: 'Gewicht', suffix: 'kg' }, h('input', { type: 'number', step: '0.1', className: 'ff-input', value: p.weight, onChange: (e) => setP({ ...p, weight: e.target.value === '' ? '' : +e.target.value }) }))),
             h(Field, { label: 'Geschlecht' }, h('div', { className: 'row gap-8' }, [['m', 'Männlich'], ['w', 'Weiblich'], ['d', 'Divers']].map(([v, l]) =>
               h('button', { key: v, className: 'ff-pill' + (p.sex === v ? ' is-active' : ''), style: { flex: 1, justifyContent: 'center' }, onClick: () => setP({ ...p, sex: v }) }, l)))))),
-        h(Card, { title: 'Leistungskennzahlen', icon: 'gauge' },
-          h('div', { className: 'ff-grid grid-2', style: { gap: 16 } },
-            h(KStat, { label: 'BMI', value: bmi }),
-            h(KStat, { label: 'VO₂max', value: fmt.n(a.vo2max, 1), unit: 'ml/min/kg', color: 'good' }),
-            h(KStat, { label: 'FTP / kg', value: wkg, unit: 'W/kg', color: 'sport-bike' }),
-            h(KStat, { label: 'Schwellen-Pace', value: fmt.pace(a.runThrPace), unit: '/km', color: 'sport-run' })))),
+        h(KontoCard)),
 
-      /* zones */
-      h('div', { className: 'col gap-18' },
+      /* row 2: Einstellungen über die gesamte Breite */
+      h(EinstellungenCard),
+
+      /* row 3: beide Zonen nebeneinander */
+      h('div', { className: 'ff-grid', style: { gridTemplateColumns: '1fr 1fr', gap: 18, alignItems: 'start' } },
         h(Card, { title: 'Herzfrequenz-Zonen', icon: 'heart', info: 'Zonen werden aus der Schwellen-HF (LTHR) abgeleitet — manuell anpassbar.' },
           h('div', { className: 'ff-grid grid-3', style: { gap: 12, marginBottom: 18 } },
             h(Field, { label: 'Ruhepuls', suffix: 'bpm' }, h('input', { type: 'number', className: 'ff-input', value: restHr, onChange: (e) => setRestHr(+e.target.value) })),
@@ -90,12 +93,26 @@
           h('div', { className: 'row gap-12 wrap', style: { marginBottom: 18, alignItems: 'flex-end' } },
             h(Field, { label: 'FTP', suffix: 'W' }, h('input', { type: 'number', className: 'ff-input', style: { width: 130 }, value: ftp, onChange: (e) => setFtp(+e.target.value) })),
             h('div', { className: 'row center gap-6', style: { height: 42 } },
-              h('input', { type: 'range', min: 180, max: 360, value: ftp, onChange: (e) => setFtp(+e.target.value), className: 'ff-range', style: { flex: 1, minWidth: 140 } }),
+              h('input', { type: 'range', min: 180, max: 360, value: ftp || 250, onChange: (e) => setFtp(+e.target.value), className: 'ff-range', style: { flex: 1, minWidth: 140 } }),
               h('span', { className: 'mono', style: { width: 64, fontSize: 13, color: 'var(--sport-bike)' } }, `${wkg} W/kg`))),
-          h(ZoneEditor, { zones: pwZones, deriveKey: 'w', unit: 'W', color: 'sport-bike' })),
-        h(AiInsight, { title: 'KI-Zonenabgleich' }, `Basierend auf deinen letzten Schwellen-Einheiten liegt deine geschätzte LTHR bei ${thrHr} bpm und die FTP bei ${ftp} W. FitFlow empfiehlt, die Zonen alle 6–8 Wochen über einen Rampentest zu überprüfen.`)));
+          h(ZoneEditor, { zones: pwZones, deriveKey: 'w', unit: 'W', color: 'sport-bike' }))),
 
-    return h(Fragment, null, tabRow, h('div', { key: tab }, tab === 'design' ? h(GlassDesign) : settingsView));
+      empty
+        ? h(AiInsight, { title: 'Zonen einrichten' }, 'Trag deine Schwellen-Herzfrequenz (LTHR), deinen Maximal- und Ruhepuls sowie deine FTP ein — FitFlow leitet daraus automatisch deine Trainingszonen ab.')
+        : h(AiInsight, { title: 'KI-Zonenabgleich' }, `Basierend auf deinen letzten Schwellen-Einheiten liegt deine geschätzte LTHR bei ${thrHr} bpm und die FTP bei ${ftp} W. FitFlow empfiehlt, die Zonen alle 6–8 Wochen über einen Rampentest zu überprüfen.`),
+
+      /* row 4: Leistungskennzahlen über die gesamte Breite */
+      h(Card, { title: 'Leistungskennzahlen', icon: 'gauge' },
+        h('div', { className: 'ff-grid', style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 } },
+          h(KStat, { label: 'BMI', value: bmi }),
+          h(KStat, { label: 'VO₂max', value: empty ? '—' : fmt.n(a.vo2max, 1), unit: 'ml/min/kg', color: 'good' }),
+          h(KStat, { label: 'FTP / kg', value: wkg, unit: 'W/kg', color: 'sport-bike' }),
+          h(KStat, { label: 'Schwellen-Pace', value: empty ? '—' : fmt.pace(a.runThrPace), unit: '/km', color: 'sport-run' }))),
+
+      /* row 5: Gesundheit über die gesamte Breite */
+      h(GesundheitCard));
+
+    return settingsView;
   }
 
   function KStat({ label, value, unit, color }) {
@@ -229,7 +246,7 @@
     if (!G) return h('div', { className: 'panel panel-pad', style: { color: 'var(--text-3)' } }, 'Liquid-Glass-Engine wird geladen …');
     const upd = (k) => (v) => G.set({ [k]: v });
     const setBg = (k) => (v) => B.set({ [k]: v });
-    const onPhoto = (file) => { fileToScaledDataURL(file).then((data) => B.set({ photo: data, mode: 'photo' })).catch(() => {}); };
+    const onPhoto = (file) => { fileToScaledDataURL(file).then((data) => B.set({ photo: data, mode: 'photo', photoScale: 1, photoX: 50, photoY: 50 })).catch(() => {}); };
     const MODES = [
       { id: 'etheral', label: 'Nebel' },
       { id: 'beams', label: 'Strahlen' },
@@ -245,7 +262,11 @@
         h(Card, { title: 'Hintergrund', icon: 'image', info: 'Wähle eine Szene und Farbe — live hinter allen Glas-Kästchen in jedem Reiter.' },
           h('div', { className: 'ff-bgtiles' },
             MODES.map((m) => h(BgTile, { key: m.id, mode: m.id, label: m.label, active: b.mode === m.id, color: b.color, onSelect: () => setBg('mode')(m.id) }))),
-          b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null }) }),
+          b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
+          b.mode === 'photo' && h('div', { className: 'ff-bg-sliders', style: { marginTop: 16 } },
+            h(GSlider, { label: 'Größe', value: Math.round(b.photoScale * 100), min: 100, max: 300, format: (v) => v + '%', hint: 'Foto vergrößern – zoomt in den Bildausschnitt', onChange: (v) => setBg('photoScale')(v / 100) }),
+            h(GSlider, { label: 'Ausschnitt horizontal', value: b.photoX, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach links / rechts schieben', onChange: setBg('photoX') }),
+            h(GSlider, { label: 'Ausschnitt vertikal', value: b.photoY, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach oben / unten schieben', onChange: setBg('photoY') })),
           h('div', { className: 'ff-bg-controls' + (b.mode === 'photo' ? ' ff-bg-controls--solo' : '') },
             b.mode !== 'photo' && h('div', { className: 'col gap-10' },
               h('span', { className: 'label', style: { display: 'flex', alignItems: 'center', gap: 7 } }, h(Icon, { name: 'palette', size: 14, style: { color: 'var(--text-3)' } }), 'Farbe'),
@@ -316,6 +337,215 @@
         h('span', { className: 'ff-gtoggle-knob' })));
   }
 
+  /* ============================================================
+     KONTO — echte Sitzung über FFAuth: An-/Abmelden, E-Mail &
+     Passwort ändern, Datenexport als Datei, Konto löschen.
+     ============================================================ */
+  function KontoCard() {
+    const a = FF.athlete;
+    const Auth = window.FFAuth;
+    const [acct, setAcct] = useState(() => (Auth ? Auth.get() : { email: '', loggedIn: false }));
+    const [pane, setPane] = useState(null);   // null | 'email' | 'password' | 'delete'
+    const [toast, setToast] = useState(null);
+
+    useEffect(() => { if (!Auth) return; return Auth.subscribe((s) => setAcct(s)); }, []);
+    useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 3200); return () => clearTimeout(id); }, [toast]);
+
+    const flash = (msg) => setToast(msg);
+    const onExport = () => {
+      const blob = Auth.exportData();
+      const url = URL.createObjectURL(blob);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const link = document.createElement('a');
+      link.href = url; link.download = `fitflow-export-${stamp}.json`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      flash('Daten als JSON exportiert.');
+    };
+
+    return h(Card, { title: 'Konto', icon: 'profile', tour: 'konto' },
+      h('div', { className: 'col gap-14' },
+        h('div', { className: 'row between center', style: { padding: '2px 0' } },
+          h('div', { className: 'row center gap-10' },
+            h('span', { className: 'ff-acct-dot is-on' }),
+            h('div', { className: 'col gap-1' },
+              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, 'Angemeldet'),
+              h('span', { style: { fontSize: 11.5, color: 'var(--text-3)' } }, acct.email))),
+          h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'spark', size: 12 }), `FitFlow ${a.plan}`)),
+
+        toast && h('div', { className: 'ff-acct-toast' }, h(Icon, { name: 'check', size: 14 }), h('span', null, toast)),
+
+        h('div', { className: 'rule' }),
+
+        // ---- e-mail row / inline editor
+        pane === 'email'
+          ? h(EmailEditor, { current: acct.email, onCancel: () => setPane(null), onSaved: (msg) => { setPane(null); flash(msg); } })
+          : h('div', { className: 'ff-acct-row' },
+              h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+                h('span', { className: 'label' }, 'E-Mail-Adresse'),
+                h('span', { className: 'strong', style: { fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, acct.email)),
+              h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane('email') }, h(Icon, { name: 'mailOpen', size: 14 }), 'Ändern')),
+
+        // ---- password row / inline editor
+        pane === 'password'
+          ? h(PasswordEditor, { onCancel: () => setPane(null), onSaved: () => { setPane(null); flash('Passwort aktualisiert.'); } })
+          : h('div', { className: 'ff-acct-row' },
+              h('div', { className: 'col gap-1' },
+                h('span', { className: 'label' }, 'Passwort'),
+                h('span', { className: 'strong', style: { fontSize: 13.5, letterSpacing: '.12em' } }, '••••••••')),
+              h('button', { className: 'btn btn--outline btn--sm', onClick: () => setPane('password') }, h(Icon, { name: 'lock', size: 14 }), 'Ändern')),
+
+        h('button', { className: 'btn btn--ghost btn--sm', style: { alignSelf: 'flex-start' }, onClick: onExport },
+          h(Icon, { name: 'download', size: 14 }), 'Daten exportieren'),
+
+        // ---- delete (with confirmation)
+        pane === 'delete'
+          ? h('div', { className: 'ff-acct-confirm' },
+              h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
+                h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
+                h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
+              h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
+                'Alle lokal gespeicherten Zugangsdaten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
+              h('div', { className: 'row gap-8' },
+                h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane(null) }, 'Abbrechen'),
+                h('button', { className: 'btn btn--sm ff-btn-danger', onClick: () => Auth.deleteAccount() }, h(Icon, { name: 'trash', size: 14 }), 'Endgültig löschen')))
+          : h('button', { className: 'ff-acct-danger', onClick: () => setPane('delete') },
+              h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'),
+
+        h('div', { className: 'rule' }),
+        h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
+          h(Icon, { name: 'logout', size: 16 }), 'Abmelden')));
+  }
+
+  /* inline e-mail editor */
+  function EmailEditor({ current, onCancel, onSaved }) {
+    const Auth = window.FFAuth;
+    const [val, setVal] = useState(current);
+    const [err, setErr] = useState(null);
+    const save = () => {
+      const res = Auth.changeEmail(val);
+      if (!res.ok) { setErr(res.error); return; }
+      onSaved('E-Mail-Adresse geändert.');
+    };
+    return h('div', { className: 'ff-acct-edit' },
+      h(Field, { label: 'Neue E-Mail-Adresse' },
+        h('input', { className: 'ff-input' + (err ? ' is-err' : ''), type: 'email', value: val, autoFocus: true,
+          onChange: (e) => { setVal(e.target.value); setErr(null); } })),
+      err && h('div', { className: 'ff-field-err' }, err),
+      h('div', { className: 'row gap-8', style: { marginTop: 12 } },
+        h('button', { className: 'btn btn--ghost btn--sm', onClick: onCancel }, 'Abbrechen'),
+        h('button', { className: 'btn btn--primary btn--sm', onClick: save }, h(Icon, { name: 'check', size: 14 }), 'Speichern')));
+  }
+
+  /* inline password editor: current + new + confirm */
+  function PasswordEditor({ onCancel, onSaved }) {
+    const Auth = window.FFAuth;
+    const [cur, setCur] = useState('');
+    const [next, setNext] = useState('');
+    const [conf, setConf] = useState('');
+    const [show, setShow] = useState(false);
+    const [err, setErr] = useState(null);   // { field, error }
+    const save = () => {
+      if (next !== conf) { setErr({ field: 'conf', error: 'Die Passwörter stimmen nicht überein.' }); return; }
+      const res = Auth.changePassword(cur, next);
+      if (!res.ok) { setErr(res); return; }
+      onSaved();
+    };
+    const field = (label, val, set, fieldKey, ph) => h(Field, { label },
+      h('div', { className: 'ff-input-wrap' },
+        h('input', { className: 'ff-input' + (err && err.field === fieldKey ? ' is-err' : ''), type: show ? 'text' : 'password',
+          value: val, placeholder: ph, onChange: (e) => { set(e.target.value); setErr(null); } })));
+    return h('div', { className: 'ff-acct-edit' },
+      h('div', { className: 'col gap-10' },
+        field('Aktuelles Passwort', cur, setCur, 'current', '••••••••'),
+        field('Neues Passwort', next, setNext, 'next', 'mind. 6 Zeichen'),
+        field('Neues Passwort bestätigen', conf, setConf, 'conf', '••••••••')),
+      h('label', { className: 'row center gap-8', style: { marginTop: 10, cursor: 'pointer' } },
+        h('input', { type: 'checkbox', checked: show, onChange: (e) => setShow(e.target.checked) }),
+        h('span', { style: { fontSize: 12, color: 'var(--text-3)' } }, 'Passwörter anzeigen')),
+      err && err.error && h('div', { className: 'ff-field-err' }, err.error),
+      h('div', { className: 'row gap-8', style: { marginTop: 12 } },
+        h('button', { className: 'btn btn--ghost btn--sm', onClick: onCancel }, 'Abbrechen'),
+        h('button', { className: 'btn btn--primary btn--sm', onClick: save }, h(Icon, { name: 'check', size: 14 }), 'Passwort speichern')));
+  }
+
+  /* ============================================================
+     EINSTELLUNGEN — Einheiten, Sprache, Zeit, Benachrichtigungen
+     ============================================================ */
+  function SetRow({ label, hint, children }) {
+    return h('div', { className: 'row between center', style: { gap: 14, padding: '11px 0', borderTop: '1px solid var(--line-soft)' } },
+      h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+        h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
+        hint && h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, hint)),
+      h('div', { style: { flexShrink: 0 } }, children));
+  }
+  function Seg({ value, options, onChange }) {
+    return h('div', { className: 'row gap-6' }, options.map(([v, l]) =>
+      h('button', { key: v, className: 'ff-pill' + (value === v ? ' is-active' : ''), style: { height: 32, fontSize: 12, padding: '0 12px' }, onClick: () => onChange(v) }, l)));
+  }
+  function NotiRow({ label, value, onChange }) {
+    return h('button', { className: 'row between center', onClick: () => onChange(!value),
+      style: { width: '100%', padding: '11px 0', borderTop: '1px solid var(--line-soft)', background: 'none', border: 0, borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: 'var(--line-soft)', cursor: 'pointer', textAlign: 'left' } },
+      h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
+      h('span', { className: 'ff-gtoggle' + (value ? ' is-on' : '') }, h('span', { className: 'ff-gtoggle-knob' })));
+  }
+  function EinstellungenCard() {
+    const [units, setUnits] = useState('metric');
+    const [lang, setLang] = useState('de');
+    const [tz, setTz] = useState('Europe/Vienna');
+    const [week, setWeek] = useState('mo');
+    const [noti, setNoti] = useState({ reminder: true, weekly: true, sync: false, push: true });
+    const sel = (v, set) => h('select', { className: 'ff-input', style: { width: 188, height: 36 }, value: v, onChange: (e) => set(e.target.value) },
+      v === lang
+        ? [['de', 'Deutsch'], ['en', 'English'], ['it', 'Italiano']].map(([k, l]) => h('option', { key: k, value: k }, l))
+        : [['Europe/Vienna', 'Wien (MEZ)'], ['Europe/Berlin', 'Berlin (MEZ)'], ['Europe/Rome', 'Rom (MEZ)'], ['Europe/London', 'London (GMT)']].map(([k, l]) => h('option', { key: k, value: k }, l)));
+    return h(Card, { title: 'Einstellungen', icon: 'settings' },
+      h('div', { className: 'col' },
+        h(SetRow, { label: 'Einheiten', hint: 'Distanz, Gewicht & Tempo', children: h(Seg, { value: units, options: [['metric', 'Metrisch'], ['imperial', 'Imperial']], onChange: setUnits }) }),
+        h(SetRow, { label: 'Sprache', children: sel(lang, setLang) }),
+        h(SetRow, { label: 'Zeitzone', children: sel(tz, setTz) }),
+        h(SetRow, { label: 'Wochenstart', children: h(Seg, { value: week, options: [['mo', 'Mo'], ['su', 'So']], onChange: setWeek }) }),
+        h('div', { className: 'label', style: { padding: '16px 0 2px' } }, 'Benachrichtigungen'),
+        h(NotiRow, { label: 'Trainingserinnerungen', value: noti.reminder, onChange: (v) => setNoti({ ...noti, reminder: v }) }),
+        h(NotiRow, { label: 'Wochenrückblick per E-Mail', value: noti.weekly, onChange: (v) => setNoti({ ...noti, weekly: v }) }),
+        h(NotiRow, { label: 'Sync- & Import-Hinweise', value: noti.sync, onChange: (v) => setNoti({ ...noti, sync: v }) }),
+        h(NotiRow, { label: 'Push auf Mobilgerät', value: noti.push, onChange: (v) => setNoti({ ...noti, push: v }) })));
+  }
+
+  /* ============================================================
+     GESUNDHEIT — Basiswerte + Verletzungs-/Krankheitshistorie
+     ============================================================ */
+  function GesundheitCard() {
+    const r = FF.recovery;
+    const empty = !!FF.empty;
+    const [items, setItems] = useState(empty ? [] : [
+      { id: 1, label: 'ITBS – leichtes Tractus-Syndrom', area: 'Knie rechts', date: 'seit Mai 2026', kind: 'injury', status: 'active' },
+      { id: 2, label: 'Patellasehnen-Reizung', area: 'Knie rechts', date: 'Apr 2026', kind: 'injury', status: 'healed' },
+      { id: 3, label: 'Grippaler Infekt', area: 'Atemwege · 5 Tage Pause', date: 'Feb 2026', kind: 'illness', status: 'healed' },
+    ]);
+    const toggle = (id) => setItems((a) => a.map((it) => it.id === id ? { ...it, status: it.status === 'active' ? 'healed' : 'active' } : it));
+    const remove = (id) => setItems((a) => a.filter((it) => it.id !== id));
+    const add = () => setItems((a) => [{ id: Date.now(), label: 'Neuer Eintrag', area: 'Bereich', date: 'heute', kind: 'injury', status: 'active' }, ...a]);
+    return h(Card, { title: 'Gesundheit', icon: 'heart' },
+      h('div', { className: 'ff-grid grid-3', style: { gap: 12, marginBottom: 20 } },
+        h(KStat, { label: 'Ruhepuls', value: empty ? '—' : r.rhr.val, unit: 'bpm', color: 'sport-run' }),
+        h(KStat, { label: 'HRV Ø', value: empty ? '—' : r.hrv.val, unit: 'ms', color: 'good' }),
+        h(KStat, { label: 'Schlaf Ø', value: empty ? '—' : fmt.n(r.sleep.val, 1), unit: 'h', color: 'z2' })),
+      h('div', { className: 'row between center', style: { marginBottom: 12 } },
+        h('span', { className: 'label' }, 'Verletzungs- & Krankheitshistorie'),
+        h('button', { className: 'btn btn--ghost btn--sm', onClick: add }, h(Icon, { name: 'plus', size: 13 }), 'Eintrag')),
+      h('div', { className: 'col gap-8' }, items.length === 0
+        ? h('div', { style: { fontSize: 12.5, color: 'var(--text-4)', padding: '8px 2px' } }, 'Keine Einträge – alles im grünen Bereich.')
+        : items.map((it) => h('div', { key: it.id, className: 'row center gap-12', style: { padding: '11px 13px', background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10 } },
+          h('span', { className: 'ff-inj-ic' + (it.status === 'active' ? ' is-active' : '') }, h(Icon, { name: it.kind === 'illness' ? 'drop' : 'heart', size: 14 })),
+          h('div', { className: 'col gap-1', style: { flex: 1, minWidth: 0 } },
+            h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, it.label),
+            h('span', { style: { fontSize: 11.5, color: 'var(--text-4)' } }, `${it.area} · ${it.date}`)),
+          h('button', { className: 'ff-pill' + (it.status === 'active' ? '' : ' is-active'), style: { height: 28, fontSize: 11, padding: '0 11px', flexShrink: 0 }, onClick: () => toggle(it.id) }, it.status === 'active' ? 'Aktiv' : 'Verheilt'),
+          h('button', { className: 'ff-xbtn', onClick: () => remove(it.id), title: 'Entfernen' }, h(Icon, { name: 'x', size: 13 }))))));
+  }
+
   window.Screens = window.Screens || {};
   window.Screens.Profil = Profil;
+  window.Screens.Design = GlassDesign;
 })();
