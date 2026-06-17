@@ -15,6 +15,25 @@
   const PLATFORMS = { bike: ['Wahoo', 'Zwift', 'Garmin', 'Outdoor'], run: ['Garmin', 'Coros', 'Outdoor', 'Laufband'], lift: ['Hevy', 'Strong', 'Notiz'] };
   const tssEstimate = (dur, zone) => Math.round(dur * ({ z1: 0.55, z2: 0.82, z3: 1.15, z4: 1.5, z5: 1.75 }[zone] || 1));
   const parseTime = (t) => { const [hh, mm] = (t || '0:0').split(':').map(Number); return hh + (mm || 0) / 60; };
+  // ISO-8601 Kalenderwoche (die Woche, in der der Donnerstag liegt, bestimmt das Jahr)
+  const isoWeek = (date) => {
+    const t = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    t.setUTCDate(t.getUTCDate() + 3 - ((t.getUTCDay() + 6) % 7));
+    const firstThu = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+    firstThu.setUTCDate(firstThu.getUTCDate() + 3 - ((firstThu.getUTCDay() + 6) % 7));
+    return 1 + Math.round((t - firstThu) / (7 * 86400000));
+  };
+  // ---- Persistenz der Planung (localStorage), pro Kalenderwoche (Montag-Datum) ----
+  const PLAN_KEY = 'fitflow.planner.v1';
+  const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const loadPlan = () => { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } };
+  const savePlanWeek = (key, dayObjs) => {
+    try {
+      const all = loadPlan();
+      all[key] = dayObjs.map((d) => d.items);
+      localStorage.setItem(PLAN_KEY, JSON.stringify(all));
+    } catch (e) { /* noop */ }
+  };
 
   /* ---------- workout-builder model + helpers ----------
      A workout is a list of rows. Each row is either a steady segment
@@ -242,6 +261,7 @@
     const [dropDay, setDropDay] = useState(null);
     const plannedTss = days.reduce((s, d) => s + d.items.reduce((a, it) => a + it.tss, 0), 0);
     const plannedDur = days.reduce((s, d) => s + d.items.reduce((a, it) => a + it.dur, 0), 0);
+    const kw = isoWeek(days[0].dateObj);
     const sessionCount = days.reduce((s, d) => s + d.items.length, 0);
     const suggestions = days.reduce((s, d) => s + d.items.filter((it) => it.suggested).length, 0);
     const zoneAgg = ['z1', 'z2', 'z3', 'z4', 'z5'].map((z) => ({ zone: z, value: days.reduce((s, d) => s + d.items.filter((it) => it.zone === z).reduce((a, it) => a + it.dur, 0), 0) }));
@@ -252,7 +272,7 @@
 
     return h('div', { className: 'pl-view' },
       h(Card, {
-        className: 'pl-main', title: 'Kalenderwoche · KW 24', icon: 'calendar',
+        className: 'pl-main', title: `Kalenderwoche · KW ${kw}`, icon: 'calendar',
         style: { alignSelf: 'stretch' },
         right: h('div', { className: 'row center gap-8' },
           h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'flame', size: 12 }), 'Load · Polarisiert')),
@@ -269,8 +289,8 @@
               h('div', { className: 'ff-daycol-head', onClick: () => onSelDay(di), title: 'Tagesansicht öffnen' },
                 h('div', { className: 'row between center' },
                   h('div', { className: 'col' },
-                    h('span', { className: 'label', style: { color: isSel ? 'var(--accent-bright)' : 'var(--text-3)' } }, d.day),
-                    h('span', { className: 'metric', style: { fontSize: 16 } }, d.date)),
+                    h('span', { className: 'label', style: { color: (isSel || d.isToday) ? 'var(--accent-bright)' : 'var(--text-3)' } }, d.day, d.isToday && h('span', { style: { fontSize: 8.5, marginLeft: 4, color: 'var(--accent-bright)' } }, 'heute')),
+                    h('span', { className: 'metric', style: { fontSize: 16, color: d.isToday ? 'var(--accent-bright)' : undefined } }, d.date)),
                   dayTss > 0 && h('span', { className: 'mono', style: { fontSize: 10, color: 'var(--text-3)' } }, `${dayTss}`)),
                 h('div', { style: { height: 3, borderRadius: 99, marginTop: 7, background: 'rgba(255,255,255,.06)', overflow: 'hidden' } },
                   h('div', { style: { height: '100%', width: `${(dayTss / maxDayTss) * 100}%`, background: dayTss ? 'var(--accent)' : 'transparent', borderRadius: 99 } }))),
@@ -334,7 +354,7 @@
 
     return h('div', { className: 'pl-view' },
       h(Card, {
-        className: 'pl-main', title: `${d.day} · ${d.date}. Juni`, icon: 'calendar',
+        className: 'pl-main', title: `${d.day} · ${d.date}. ${MONTHS_LONG[d.dateObj.getMonth()]}`, icon: 'calendar',
         right: dayTss > 0
           ? h('span', { className: 'mono', style: { fontSize: 12, color: 'var(--text-2)' } }, `${fmt.dur(dayDur)} · ${dayTss} TSS`)
           : h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--z1)' } }), 'Ruhetag'),
@@ -478,18 +498,53 @@
      PLANUNG — shell + view switching
      ========================================================= */
   function Planung({ onNav }) {
+    // Leeres Konto (neues Login/Onboarding aus dem Handoff): Empty-State statt Planer
     if (FF.empty) return h(EmptyState, { icon: 'calendar', title: 'Noch keine Trainingswoche',
-      body: 'Sobald Aktivit\u00e4ten vorliegen oder du Einheiten planst, erscheint hier dein Wochen- und Tagesplan.',
-      cta: 'Dienst verbinden', onCta: () => onNav && onNav('import'), cta2: 'Profil ausf\u00fcllen', onCta2: () => onNav && onNav('profil') });
+      body: 'Sobald Aktivitäten vorliegen oder du Einheiten planst, erscheint hier dein Wochen- und Tagesplan.',
+      cta: 'Dienst verbinden', onCta: () => onNav && onNav('import'), cta2: 'Profil ausfüllen', onCta2: () => onNav && onNav('profil') });
+    const TODAY = FF.TODAY;
+    const todayIdx = (TODAY.getDay() + 6) % 7;            // Mo=0 … So=6
+    const monThis = FF.addDays(TODAY, -todayIdx);          // Montag der aktuellen Woche
+    const DOW = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const saved = loadPlan();                              // gespeicherte Wochen aus localStorage
+    /* baut die 7 Tage einer Woche (offset in Wochen ab heute). Gespeicherte
+       Einheiten haben Vorrang; sonst seedet nur die aktuelle Woche (offset 0)
+       mit den KI-Vorschlägen aus dem Plan. */
+    const buildWeek = (offset) => {
+      const mon = FF.addDays(monThis, offset * 7);
+      const savedWeek = saved[isoDate(mon)];
+      return Array.from({ length: 7 }, (_, i) => {
+        const dateObj = FF.addDays(mon, i);
+        let items;
+        if (savedWeek && Array.isArray(savedWeek[i])) {
+          items = savedWeek[i].map((it) => ({ ...it }));
+        } else {
+          const tpl = offset === 0 ? FF.planner.sessions[i] : null;
+          items = tpl ? tpl.items.map((it) => ({ ...it, suggested: it.ai })) : [];
+        }
+        return { day: DOW[i], dateObj, date: dateObj.getDate(), isToday: offset === 0 && i === todayIdx, items };
+      });
+    };
     const [view, setView] = useState('woche'); // tag | woche | jahr
-    const [selDay, setSelDay] = useState(1);
-    const [days, setDays] = useState(() => FF.planner.sessions.map((d) => ({ ...d, items: d.items.map((it) => ({ ...it, suggested: it.ai })) })));
+    const [weekOffset, setWeekOffset] = useState(0); // 0 = aktuelle Woche
+    const [selDay, setSelDay] = useState(todayIdx);  // Tag-Ansicht startet auf heute
+    const [weeks, setWeeks] = useState(() => ({ [isoDate(monThis)]: buildWeek(0) }));
     const [modal, setModal] = useState(null);   // { dayIdx, time? }
     const [evModal, setEvModal] = useState(false);
     const [events, setEvents] = useState([
       { name: 'Ötztaler Radmarathon', date: '2026-08-30', dist: '227 km · 5500 hm', type: 'A' },
       { name: 'Wachau Halbmarathon', date: '2026-09-20', dist: '21,1 km', type: 'B' },
     ]);
+
+    const weekKey = isoDate(FF.addDays(monThis, weekOffset * 7));
+    const days = weeks[weekKey] || buildWeek(weekOffset);
+    // Änderungen landen in der sichtbaren Woche und werden in localStorage gespeichert
+    const setDays = (updater) => setWeeks((w) => {
+      const cur = w[weekKey] || buildWeek(weekOffset);
+      const next = typeof updater === 'function' ? updater(cur) : updater;
+      savePlanWeek(weekKey, next);
+      return { ...w, [weekKey]: next };
+    });
 
     const addItem = (di, item) => { setDays((ds) => ds.map((d, i) => i === di ? { ...d, items: [...d.items, item].sort((a, b) => parseTime(a.time) - parseTime(b.time)) } : d)); setModal(null); };
     const removeItem = (di, ii) => setDays((ds) => ds.map((d, i) => i === di ? { ...d, items: d.items.filter((_, j) => j !== ii) } : d));
@@ -509,13 +564,23 @@
     };
 
     const goDay = (di) => { setSelDay(di); setView('tag'); };
-    const stepDay = (dir) => setSelDay((s) => Math.max(0, Math.min(6, s + dir)));
+    const stepDay = (dir) => {                              // Tagessprung, läuft über Wochengrenzen
+      const n = selDay + dir;
+      if (n < 0) { setWeekOffset((o) => o - 1); setSelDay(6); }
+      else if (n > 6) { setWeekOffset((o) => o + 1); setSelDay(0); }
+      else setSelDay(n);
+    };
+    const stepWeek = (dir) => setWeekOffset((o) => o + dir);
 
     const d = days[selDay];
 
     /* period label per view */
-    const periodMain = view === 'tag' ? `${d.day}, ${d.date}. Juni` : view === 'woche' ? '8.–14. Juni 2026' : 'Saison 2026';
-    const periodSub = view === 'tag' ? 'Tagesplanung' : view === 'woche' ? 'Kalenderwoche 24' : 'Jahresperiodisierung';
+    const wkA = days[0].dateObj, wkB = days[6].dateObj;
+    const weekLbl = wkA.getMonth() === wkB.getMonth()
+      ? `${wkA.getDate()}.–${wkB.getDate()}. ${MONTHS_LONG[wkB.getMonth()]} ${wkB.getFullYear()}`
+      : `${wkA.getDate()}. ${MONTHS_LONG[wkA.getMonth()]} – ${wkB.getDate()}. ${MONTHS_LONG[wkB.getMonth()]} ${wkB.getFullYear()}`;
+    const periodMain = view === 'tag' ? `${d.day}, ${d.date}. ${MONTHS_LONG[d.dateObj.getMonth()]}` : view === 'woche' ? weekLbl : `Saison ${FF.annual.season}`;
+    const periodSub = view === 'tag' ? 'Tagesplanung' : view === 'woche' ? `Kalenderwoche ${isoWeek(days[0].dateObj)}` : 'Jahresperiodisierung';
 
     return h('div', { className: 'col', style: { gap: 0 } },
       /* view header */
@@ -524,10 +589,14 @@
           h('div', { className: 'seg' }, [['tag', 'Tag'], ['woche', 'Woche'], ['jahr', 'Jahr']].map(([v, l]) =>
             h('button', { key: v, className: view === v ? 'is-active' : '', onClick: () => setView(v) }, l))),
           view === 'tag' && h('div', { className: 'pl-nav' },
-            h('button', { className: 'pl-navbtn', onClick: () => stepDay(-1), disabled: selDay === 0 }, h(Icon, { name: 'chevL', size: 16 })),
+            h('button', { className: 'pl-navbtn', onClick: () => stepDay(-1), title: 'Vorheriger Tag' }, h(Icon, { name: 'chevL', size: 16 })),
             h('div', { className: 'pl-period' }, periodMain, h('small', null, periodSub)),
-            h('button', { className: 'pl-navbtn', onClick: () => stepDay(1), disabled: selDay === 6 }, h(Icon, { name: 'chevR', size: 16 }))),
-          view !== 'tag' && h('div', { className: 'pl-period', style: { paddingLeft: 4 } }, periodMain, h('small', null, periodSub))),
+            h('button', { className: 'pl-navbtn', onClick: () => stepDay(1), title: 'Nächster Tag' }, h(Icon, { name: 'chevR', size: 16 }))),
+          view === 'woche' && h('div', { className: 'pl-nav' },
+            h('button', { className: 'pl-navbtn', onClick: () => stepWeek(-1), title: 'Vorherige Woche' }, h(Icon, { name: 'chevL', size: 16 })),
+            h('div', { className: 'pl-period' }, periodMain, h('small', null, periodSub)),
+            h('button', { className: 'pl-navbtn', onClick: () => stepWeek(1), title: 'Nächste Woche' }, h(Icon, { name: 'chevR', size: 16 }))),
+          view === 'jahr' && h('div', { className: 'pl-period', style: { paddingLeft: 4 } }, periodMain, h('small', null, periodSub))),
         h('div', { className: 'row center gap-8' },
           view === 'jahr'
             ? h('button', { className: 'btn btn--sm btn--primary', onClick: () => setEvModal(true) }, h(Icon, { name: 'trophy', size: 15 }), 'Wettkampf')
@@ -542,7 +611,7 @@
       modal != null && h('div', { className: 'ff-modal-bg', onClick: () => setModal(null) },
         h('div', { className: 'ff-modal ff-modal--wide', onClick: (e) => e.stopPropagation() },
           h('div', { className: 'row between center', style: { marginBottom: 18 } },
-            h('div', { className: 'h3' }, `Einheit planen · ${days[modal.dayIdx].day} ${days[modal.dayIdx].date}. Juni`),
+            h('div', { className: 'h3' }, `Einheit planen · ${days[modal.dayIdx].day} ${days[modal.dayIdx].date}. ${MONTHS_LONG[days[modal.dayIdx].dateObj.getMonth()]}`),
             h('button', { className: 'btn btn--icon btn--sm btn--ghost', onClick: () => setModal(null) }, h(Icon, { name: 'x', size: 16 }))),
           h(AddForm, { defaultTime: modal.time, onAdd: (item) => addItem(modal.dayIdx, item), onCancel: () => setModal(null) }))),
 

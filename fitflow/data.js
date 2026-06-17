@@ -37,7 +37,11 @@
     };
   }
 
-  const TODAY = new Date(2026, 5, 6); // 06 Jun 2026 (Sat)
+  // echtes, tagesaktuelles Datum (lokale Mitternacht) statt eingefrorenem Demo-Tag.
+  // Alles Relative (Load-Serie, Aktivitäten, Recovery-Historie, „heute" im Dashboard,
+  // Check-in-Schlüssel) leitet sich hieraus ab und wird damit automatisch tagesaktuell.
+  const _now = new Date();
+  const TODAY = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
   const dayMs = 86400000;
   const addDays = (base, n) => new Date(base.getTime() + n * dayMs);
 
@@ -371,10 +375,20 @@
   }
 
   /* ---------- notification seed (live store wraps these) ---------- */
+  // Renntermin (siehe auch screen-prognose.jsx EVENTS) + relative Zeitangaben aus dem realen Datum
+  const otzDate = new Date(2026, 7, 29);
+  const weeksToOtz = Math.max(0, Math.round((otzDate - TODAY) / (7 * 86400000)));
+  const relAgo = (ms) => {
+    const hh = Math.round(ms / 3600000);
+    if (hh < 1) return 'gerade eben';
+    if (hh < 24) return `vor ${hh}\u2009h`;
+    const dd = Math.round(ms / 86400000);
+    return dd === 1 ? 'gestern' : `vor ${dd}\u2009Tg`;
+  };
   const notifications = [
-    { id: 'n1', type: 'sync', icon: 'link', title: 'Strava synchronisiert', text: 'VO\u2082max Intervalle 4\u00d74 \u00b7 96 TSS in die Diagnostik \u00fcbernommen.', time: 'vor 14\u2009h', read: false, actId: 'a1' },
+    { id: 'n1', type: 'sync', icon: 'link', title: 'Strava synchronisiert', text: 'VO\u2082max Intervalle 4\u00d74 \u00b7 96 TSS in die Diagnostik \u00fcbernommen.', time: relAgo(14 * 3600000), read: false, actId: 'a1' },
     { id: 'n2', type: 'recovery', icon: 'moon', title: 'Erholung im gr\u00fcnen Bereich', text: 'Recovery 74\u2009% \u00b7 HRV +6\u2009ms \u00fcber Baseline \u2014 heute ist eine Qualit\u00e4tseinheit m\u00f6glich.', time: 'heute 06:12', read: false, nav: 'dashboard' },
-    { id: 'n3', type: 'event', icon: 'trophy', title: '\u00d6tztaler in 11 Wochen', text: 'Form-Prognose aktualisiert: +20 TSB zum Renntag bei Taper-Start 08.\u2009Aug.', time: 'gestern', read: true, nav: 'prognose' },
+    { id: 'n3', type: 'event', icon: 'trophy', title: `\u00d6tztaler in ${weeksToOtz} Wochen`, text: 'Form-Prognose aktualisiert: +20 TSB zum Renntag bei Taper-Start 08.\u2009Aug.', time: relAgo(24 * 3600000), read: true, nav: 'prognose' },
     { id: 'n4', type: 'health', icon: 'heart', title: 'Apple Health aktualisiert', text: 'HRV 68\u2009ms \u00b7 Schlaf 7,4\u2009h \u00b7 Ruhepuls 49\u2009bpm synchronisiert.', time: 'heute 06:12', read: true, nav: 'import' },
   ];
 
@@ -392,10 +406,12 @@
       { day: 'Mi', planned: { sport: 'run', tss: 48 }, done: { sport: 'run', tss: 48 } },
       { day: 'Do', planned: { sport: 'bike', tss: 138 }, done: { sport: 'bike', tss: 138 } },
       { day: 'Fr', planned: { sport: 'run', tss: 50 }, done: null },
-      { day: 'Sa', planned: { sport: 'bike', tss: 110 }, done: null, today: true },
+      { day: 'Sa', planned: { sport: 'bike', tss: 110 }, done: null },
       { day: 'So', planned: { sport: 'bike', tss: 70 }, done: null },
     ],
   };
+  // „heute"-Markierung im Wochenstreifen auf den realen Wochentag legen (Mo=0 … So=6)
+  week.days.forEach((d, i) => { d.today = i === ((TODAY.getDay() + 6) % 7); });
 
   /* ---------- annual periodization ---------- */
   const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -409,7 +425,7 @@
       { phase: 'Load', sub: 'Pyramidal', start: 8.5, end: 10, color: 'z4', desc: 'Pyramidale Intensitätsverteilung, Wettkampf-Spezifik.' },
       { phase: 'Off-Season', sub: 'Transition', start: 10, end: 12, color: 'z2', desc: 'Ausklang, Volumen reduzieren, Saisonabschluss.' },
     ],
-    currentMonth: 5, // Jun (0-idx) -> within Load/Polarisiert
+    currentMonth: TODAY.getMonth(), // realer Monat (0-idx)
     targetEvents: [
       { name: 'Ötztaler Radmarathon', month: 8.0, type: 'A' },
       { name: 'Wachau Halbmarathon', month: 9.3, type: 'B' },

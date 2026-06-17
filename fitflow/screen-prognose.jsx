@@ -14,11 +14,12 @@
   const SHAPE = [0.06, 0.20, 0.09, 0.18, 0.05, 0.24, 0.18];
   const climbDaily = (3 / 7) / kC; // daily TSS-over-CTL that pulls ~+3 CTL / week
 
-  /* target events, day-offsets measured from TODAY (06 Jun 2026) */
+  /* feste Renntermine — Tag-Offset & Datum-Label werden aus dem realen TODAY (data.js)
+     abgeleitet, damit „in N Wochen" und das Datum tagesaktuell bleiben */
   const EVENTS = [
-    { id: 'otz', name: 'Ötztaler Radmarathon', short: 'Ötztaler', type: 'A', offset: 84, sport: 'bike', dist: '227 km · 5 500 hm', dateLbl: '29. Aug' },
-    { id: 'wachau', name: 'Wachau Halbmarathon', short: 'Wachau', type: 'B', offset: 128, sport: 'run', dist: '21,1 km', dateLbl: '12. Okt' },
-  ];
+    { id: 'otz', name: 'Ötztaler Radmarathon', short: 'Ötztaler', type: 'A', sport: 'bike', dist: '227 km · 5 500 hm', date: new Date(2026, 7, 29) },
+    { id: 'wachau', name: 'Wachau Halbmarathon', short: 'Wachau', type: 'B', sport: 'run', dist: '21,1 km', date: new Date(2026, 9, 12) },
+  ].map((e) => ({ ...e, offset: Math.round((e.date - FF.TODAY) / 86400000), dateLbl: `${e.date.getDate()}. ${FF.months[e.date.getMonth()]}` }));
 
   /* ---- pure forward simulation ---- */
   function project(start, raceOffset, peakCtl, taperWeeks, taperDrop, tail) {
