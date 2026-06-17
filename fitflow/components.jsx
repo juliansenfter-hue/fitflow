@@ -229,23 +229,10 @@
 
   function Topbar({ title, sub, onMenu, children }) {
     const ref = useRef(null);
-    useEffect(() => {
-      const onMove = (e) => {
-        const el = ref.current; if (!el) return;
-        const r = el.getBoundingClientRect();
-        // nearest point on the bar to the cursor → glow rides the closest edge
-        const cx = Math.max(r.left, Math.min(e.clientX, r.right));
-        const cy = Math.max(r.top, Math.min(e.clientY, r.bottom));
-        const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-        const THRESH = 150; // how near you must come before it lights up
-        const op = dist <= 0 ? 1 : Math.max(0, 1 - dist / THRESH);
-        el.style.setProperty('--mx', (cx - r.left) + 'px');
-        el.style.setProperty('--my', (cy - r.top) + 'px');
-        el.style.setProperty('--shine', op.toFixed(3));
-      };
-      window.addEventListener('mousemove', onMove);
-      return () => window.removeEventListener('mousemove', onMove);
-    }, []);
+    // Hinweis: Die eigene Maus-Verfolgung der Topbar (--mx/--my/--shine) wurde entfernt —
+    // sie speiste nur das deaktivierte .ff-topbar-shine (display:none) und lief ungedrosselt
+    // bei jeder Bewegung. Der sichtbare Rand-Glow der Topbar kommt ohnehin über --lx/--ly
+    // aus dem zentralen Spotlight-Tracker (app.jsx), der .ff-topbar mitführt.
     return h('header', { className: 'ff-topbar', ref: ref },
       h('div', { className: 'ff-topbar-shine' }),
       h('div', { className: 'row center gap-14', style: { minWidth: 0, position: 'relative', zIndex: 1 } },

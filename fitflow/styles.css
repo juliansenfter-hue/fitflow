@@ -215,6 +215,7 @@ body::after{
 .ff-hero-card>.panel-pad{flex:1;display:flex;flex-direction:column}
 .panel-head{
   display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;row-gap:12px;
   margin-bottom:18px;
 }
 .panel-head .h3{display:flex;align-items:center;gap:10px}
@@ -564,6 +565,9 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
           mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite:xor;
           mask-composite:exclude;
+  /* eigene Compositor-Ebene: das Neuzeichnen des wandernden Glows bleibt in dieser
+     Ebene und zieht nicht die ganze (Milchglas-)Karte mit → flüssiger bei Hover */
+  transform:translateZ(0);
 }
 /* faint inner wash so the surface still catches a little light */
 .panel::after,.tile::after,.ff-topbar::after{
@@ -571,6 +575,7 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
   background:radial-gradient(var(--glow-size,340px) circle at var(--lx) var(--ly),
     color-mix(in srgb, var(--glow-color) calc(var(--glow-fill) * 100%), transparent),
     transparent 58%);
+  transform:translateZ(0);
 }
 /* the sidebar gets the same white rim light as the cards */
 .ff-sidebar::after,.ff-sidebar::before{content:''}
@@ -861,6 +866,24 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 @media (max-width:900px){
   .ff-content > .ff-grid > .ff-grid{grid-template-columns:1fr !important}
 }
+/* iPad/Tablet-Hochformat (z. B. 13", 1024px): die obersten 2-Spalten-Reihen
+   des Dashboards stapeln, damit Text nicht überlappt und nichts überläuft */
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
+  .ff-grid[data-hero],
+  .ff-grid[data-dash]{grid-template-columns:1fr !important}
+  /* kein erzwungenes 410px-Minimum → kein leerer Platz unter dem aufgeklappten Vital-Detail */
+  .ff-hero-card{min-height:0 !important}
+}
+/* Touch-Geräte (per JS-Klasse erkannt, unabhängig vom Safari-Desktop-Modus): dieselben
+   iPad-Stapel-Regeln in Hoch- UND Querformat. Kein Breiten-Media-Query, da .is-touch nur
+   auf Touch-Geräten (iPad/Phone) gesetzt ist — Maus-Desktops bleiben unberührt. */
+html.is-touch .ff-grid[data-hero],
+html.is-touch .ff-grid[data-dash]{grid-template-columns:1fr !important}
+html.is-touch .ff-hero-card{min-height:0 !important}
+html.is-touch .ff-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+html.is-touch .ff-week-grid{grid-template-columns:repeat(7,minmax(132px,1fr));min-width:max-content}
+html.is-touch .pl-view{grid-template-columns:minmax(0,1fr)}
+html.is-touch .pl-main{min-height:0}
 
 /* ============================================================
    FORMS — iOS-style filled fields
@@ -1119,6 +1142,12 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .ff-daycol.is-drop{border-color:var(--accent);
   background:color-mix(in srgb,var(--accent) 12%,transparent);
   box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent)}
+/* Tablet/schmal: 7 Tagesspalten würden zu schmal — feste Mindestbreite + horizontales
+   Wischen, damit die Trainings lesbar bleiben statt „lang & schmal" gequetscht zu werden */
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
+  .ff-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+  .ff-week-grid{grid-template-columns:repeat(7,minmax(132px,1fr));min-width:max-content}
+}
 
 /* ---- workout builder ---- */
 .ff-modal--wide{max-width:660px}
@@ -1412,8 +1441,8 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .pl-badge{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;
   justify-content:center;font-weight:700;font-size:13px}
 
-@media (max-width:900px){
-  .pl-view{grid-template-columns:1fr}
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
+  .pl-view{grid-template-columns:minmax(0,1fr)}
   .pl-main{min-height:0}
 }
 

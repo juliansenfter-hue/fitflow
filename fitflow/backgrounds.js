@@ -14,6 +14,10 @@
    "Hintergrund" section of the Tweaks panel via window.FFBackground.
    ============================================================ */
 (function () {
+  // Touch-Gerät zuverlässig markieren: navigator.maxTouchPoints wird – anders als die
+  // CSS-Media-Features pointer/any-pointer – vom iPad-Safari-Desktop-Modus NICHT verfälscht.
+  // Die Klasse .is-touch lässt die iPad-Layout-Regeln (styles.css) auch im Querformat greifen.
+  try { if ((navigator.maxTouchPoints || 0) > 0) document.documentElement.classList.add('is-touch'); } catch (e) { /* noop */ }
   const KEY = 'ff-bg-v3';
 
   /* curated colour presets — the four the user asked for */
@@ -190,7 +194,12 @@
     }
     resize();
     window.addEventListener('resize', resize);
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     if (reduced) { frame(false); }
     else {
       let last = 0;
@@ -237,7 +246,12 @@
 
     const hueEl = svg.querySelector('.hue');
     let raf = null;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     if (!reduced && hueEl) {
       let v = 0, last = 0;
       (function loop(t) {
@@ -286,7 +300,12 @@
      ============================================================ */
   function buildPaths() {
     const c = S.color;
-    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
+    // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
+    // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
+    const reduced = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', '0 0 696 316');
@@ -378,6 +397,14 @@
     applyIntensity();
   }
 
+  // strukturelle Änderungen (z. B. Balkenanzahl) bauen den Hintergrund komplett neu —
+  // beim Regler-Ziehen auf höchstens 1×/Frame drosseln.
+  let renderRaf = 0;
+  function renderSoon() {
+    if (renderRaf) return;
+    renderRaf = requestAnimationFrame(() => { renderRaf = 0; render(); });
+  }
+
   function init() {
     try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved) S = Object.assign({}, DEFAULTS, saved); } catch (e) {}
     render();
@@ -393,7 +420,8 @@
       // intensity-only change → just fade, no costly rebuild
       const structural = ['mode', 'color', 'solidColor', 'bars', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
       const photoXform = ['photoScale', 'photoX', 'photoY'].some((k) => k in partial && partial[k] !== prev[k]);
-      if (structural || !root) render();
+      if (!root) render();
+      else if (structural) renderSoon();   // teuren Rebuild auf 1×/Frame drosseln
       else if (photoXform && photoEl) applyPhotoTransform();
       else applyIntensity();
       subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
