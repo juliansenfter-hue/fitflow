@@ -120,4 +120,103 @@
   }
 
   window.OnboardingTour = OnboardingTour;
+
+  /* ============================================================
+     GEFÜHRTES ONBOARDING — dunkel, eine Frage nach der anderen,
+     Eingabe darunter, grünes „perfekt", dann die nächste Frage.
+     Wird beim ersten Login eines leeren Kontos gezeigt; speichert das
+     Profil (FFAuth.completeOnboarding) und öffnet danach die App.
+     ============================================================ */
+  const ONB_Q = [
+    { key: 'height', q: 'Wie groß bist du?', unit: 'cm', kind: 'num', min: 120, max: 230, ph: 'z. B. 182' },
+    { key: 'weight', q: 'Wie viel wiegst du?', unit: 'kg', kind: 'num', min: 35, max: 200, ph: 'z. B. 74' },
+    { key: 'age', q: 'Wie alt bist du?', unit: 'Jahre', kind: 'num', min: 12, max: 100, ph: 'z. B. 29' },
+    { key: 'sex', q: 'Dein Geschlecht?', kind: 'choice', opts: [['m', 'Männlich'], ['w', 'Weiblich'], ['d', 'Divers']] },
+    { key: 'sport', q: 'Deine Hauptsportart?', kind: 'choice', opts: [['Radsport', 'Radsport'], ['Laufen', 'Laufen'], ['Triathlon', 'Triathlon'], ['Andere', 'Andere']] },
+    { key: 'goal', q: 'Dein Saisonziel?', kind: 'text', optional: true, ph: 'z. B. Sub-3 Marathon · Ötztaler finishen' },
+  ];
+  const ONB_PRAISE = ['Perfekt', 'Super', 'Stark', 'Top', 'Klasse', 'Passt'];
+
+  function OnboardingFlow({ account, onDone }) {
+    const [i, setI] = useState(0);
+    const [answers, setAnswers] = useState({});
+    const [val, setVal] = useState('');
+    const [ok, setOk] = useState(false);     // grünes „perfekt" sichtbar → gleich weiter
+    const [err, setErr] = useState(false);
+    const [done, setDone] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const step = ONB_Q[i];
+    const firstName = account && account.name ? String(account.name).split(/\s+/)[0] : '';
+
+    const finish = (acc) => {
+      setDone(true); setSaving(true);
+      const fin = (window.FFAuth && window.FFAuth.completeOnboarding)
+        ? window.FFAuth.completeOnboarding(acc) : Promise.resolve();
+      Promise.resolve(fin).then(function () {
+        setSaving(false);
+        setTimeout(function () { onDone && onDone(); }, 900);
+      });
+    };
+    const advance = (acc) => {
+      setOk(false); setVal(''); setErr(false);
+      if (i >= ONB_Q.length - 1) { finish(acc); return; }
+      setI(i + 1);
+    };
+    const commit = (raw) => {
+      if (ok) return;
+      let v = raw, store = true;
+      if (step.kind === 'num') {
+        const n = parseInt(v, 10);
+        if (isNaN(n) || n < step.min || n > step.max) { setErr(true); return; }
+        v = n;
+      } else if (step.kind === 'text') {
+        v = String(v || '').trim();
+        if (!v) { if (step.optional) store = false; else { setErr(true); return; } }
+      }
+      setErr(false);
+      const next = store ? Object.assign({}, answers, { [step.key]: v }) : Object.assign({}, answers);
+      setAnswers(next);
+      setOk(true);
+      setTimeout(function () { advance(next); }, 720);
+    };
+    const back = () => { if (i > 0) { setI(i - 1); setVal(''); setOk(false); setErr(false); } };
+
+    const progress = h('div', { className: 'ff-onb-progress' }, ONB_Q.map(function (_, k) {
+      return h('span', { key: k, className: 'ff-onb-pip' + (k < i ? ' is-done' : '') + (k === i ? ' is-active' : '') });
+    }));
+
+    if (done) {
+      return h('div', { className: 'ff-onb' }, progress,
+        h('div', { className: 'ff-onb-stage' },
+          h('div', { className: 'ff-onb-check' }, h(Icon, { name: 'check', size: 42 })),
+          h('h1', { className: 'ff-onb-q' }, saving ? 'Wird gespeichert …' : 'Alles bereit' + (firstName ? ', ' + firstName : '') + '!'),
+          h('p', { className: 'ff-onb-sub' }, 'Dein FitFlow ist eingerichtet.')));
+    }
+
+    return h('div', { className: 'ff-onb' }, progress,
+      h('div', { className: 'ff-onb-stage', key: i },
+        h('div', { className: 'ff-onb-count' }, 'Frage ' + (i + 1) + ' von ' + ONB_Q.length),
+        h('h1', { className: 'ff-onb-q' }, step.q),
+        step.kind === 'choice'
+          ? h('div', { className: 'ff-onb-choices' }, step.opts.map(function (o) {
+              return h('button', { key: o[0], type: 'button',
+                className: 'ff-onb-choice' + (ok && answers[step.key] === o[0] ? ' is-ok' : ''),
+                onClick: function () { commit(o[0]); } }, o[1]);
+            }))
+          : h('form', { className: 'ff-onb-form', onSubmit: function (e) { e.preventDefault(); commit(val); } },
+              h('div', { className: 'ff-onb-inputwrap' + (ok ? ' is-ok' : '') + (err ? ' is-err' : '') },
+                h('input', { className: 'ff-onb-input', type: step.kind === 'num' ? 'number' : 'text',
+                  inputMode: step.kind === 'num' ? 'numeric' : 'text', value: val, autoFocus: true, placeholder: step.ph,
+                  disabled: ok, onChange: function (e) { setVal(e.target.value); setErr(false); } }),
+                step.unit && h('span', { className: 'ff-onb-unit' }, step.unit)),
+              h('button', { type: 'submit', className: 'ff-onb-go', disabled: ok }, h(Icon, { name: 'chevR', size: 22 }))),
+        ok
+          ? h('div', { className: 'ff-onb-praise' }, h(Icon, { name: 'check', size: 16 }), ONB_PRAISE[i % ONB_PRAISE.length])
+          : h('div', { className: 'ff-onb-foot' },
+              i > 0 && h('button', { type: 'button', className: 'ff-onb-back', onClick: back }, 'Zurück'),
+              step.optional && h('button', { type: 'button', className: 'ff-onb-skip', onClick: function () { advance(answers); } }, 'Überspringen'),
+              h('button', { type: 'button', className: 'ff-onb-skipall', onClick: function () { finish(answers); } }, 'Später einrichten'))));
+  }
+
+  window.OnboardingFlow = OnboardingFlow;
 })();

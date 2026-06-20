@@ -118,6 +118,7 @@
       return {
         name: nameOf(user), email: user ? user.email : '',
         sport: m.sport || '', goal: m.goal || '',
+        height: m.height || '', weight: m.weight || '', age: m.age || '', sex: m.sex || '',
         empty: !!(user && !isOnboarded(user)), demo: false, initials: initials(nameOf(user)),
       };
     },
@@ -222,6 +223,18 @@
     markOnboarded: function () {
       if (demo || !client || !user) return Promise.resolve({ ok: true });
       return client.auth.updateUser({ data: { onboarded: true } }).then(function (res) {
+        if (!res.error) { user = res.data.user; emit(); }
+        return { ok: !res.error };
+      });
+    },
+
+    /* Onboarding-Wizard: Profilfelder + onboarded:true in user_metadata speichern */
+    completeOnboarding: function (profile) {
+      profile = profile || {};
+      if (demo) return Promise.resolve({ ok: true });
+      if (!client || !user) return Promise.resolve({ ok: false });
+      var data = Object.assign({}, profile, { onboarded: true });
+      return client.auth.updateUser({ data: data }).then(function (res) {
         if (!res.error) { user = res.data.user; emit(); }
         return { ok: !res.error };
       });

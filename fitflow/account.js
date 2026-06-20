@@ -45,6 +45,12 @@
           FF.athlete.email = acc.email || FF.athlete.email;
           FF.athlete.initials = initials(acc.name);
           if (acc.sport) FF.athlete.role = acc.sport;
+          // aus dem Onboarding-Wizard (user_metadata) übernommene Profilwerte
+          if (acc.height) FF.athlete.height = acc.height;
+          if (acc.weight) FF.athlete.weight = acc.weight;
+          if (acc.age) FF.athlete.age = acc.age;
+          if (acc.sex) FF.athlete.sex = acc.sex;
+          if (acc.goal) FF.athlete.goal = acc.goal;
         }
         FF.activities.length = 0;
         SNAP.activities.forEach((a) => FF.activities.push(a));

@@ -442,12 +442,17 @@
       const Login = window.LoginScreen;
       return h(Fragment, null,
         h('div', { className: 'ff-applocked', 'aria-hidden': true, inert: '' }, h(App, { locked: true })),
-        Login ? h(Login, { onSuccess: (res) => { setTour(!!(res && res.registered)); setAuthed(true); } }) : null);
+        Login ? h(Login, { onSuccess: () => setAuthed(true) }) : null);
     }
-    // authed: load the active account's dataset (demo = full, registered = empty)
+    // neues/leeres Konto → geführtes Onboarding (dunkel, eine Frage nach der anderen)
+    if (Auth && authed && Auth.isEmptyAccount && Auth.isEmptyAccount()) {
+      const Onb = window.OnboardingFlow;
+      if (Onb) return h(Onb, { account: Auth.currentAccount(), onDone: () => bump((n) => n + 1) });
+    }
+    // authed + onboarded: load the active account's dataset (demo = full)
     if (Acct) Acct.apply(Auth ? Auth.isEmptyAccount() : false, Auth ? Auth.currentAccount() : null);
     const acc = Auth ? Auth.currentAccount() : null;
-    return h(App, { key: acc ? acc.email : 'live', startTour: tour, onTourDone: () => setTour(false) });
+    return h(App, { key: acc ? acc.email : 'live' });
   }
 
   ReactDOM.createRoot(document.getElementById('root')).render(h(Root));
