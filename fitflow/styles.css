@@ -885,6 +885,18 @@ html.is-touch .ff-week-grid{grid-template-columns:repeat(7,minmax(132px,1fr));mi
 html.is-touch .pl-view{grid-template-columns:minmax(0,1fr)}
 html.is-touch .pl-main{min-height:0}
 
+/* ---- App-Feel auf iPad/Touch: Seitenleiste + Topbar bleiben fix, nur der
+   Inhalt scrollt. Statt Dokument-Scroll mit sticky (das auf iOS beim
+   Überscrollen mitwandert) wird die Shell auf Viewporthöhe fixiert und
+   .ff-content zum einzigen Scroll-Container. Desktop bleibt unberührt. ---- */
+html.is-touch{overscroll-behavior:none}
+html.is-touch .ff-shell{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+html.is-touch .ff-side-desktop{position:static;height:100vh;height:100dvh}
+html.is-touch .ff-sidebar{height:calc(100dvh - 28px)}
+html.is-touch .ff-main{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+html.is-touch .ff-topbar{position:relative;top:0}            /* bleibt oben im Flow, scrollt nicht weg */
+html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
 /* ============================================================
    FORMS — iOS-style filled fields
    ============================================================ */
