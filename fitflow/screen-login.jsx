@@ -1,10 +1,9 @@
-/* FitFlow — Login & Registration.
-   A clean, centred glass card over the blurred dashboard teaser. Toggles
-   between "Anmelden" and "Konto erstellen". On success the session opens and
-   the real app reveals — a fresh registration starts empty and offers the
-   guided tour. Social buttons are visual only. */
+/* FitFlow — Login, Registrierung & Passwort-Reset (Supabase).
+   A clean, centred glass card over the blurred dashboard teaser. Modes:
+   'login' | 'register' | 'forgot'. Auth calls are async (FFAuth → Supabase).
+   ResetPasswordScreen is shown by Root when the user returns via a reset link. */
 (function () {
-  const { createElement: h, useState, useRef } = React;
+  const { createElement: h, useState, Fragment } = React;
   const Icon = window.Icon;
   const Auth = window.FFAuth;
 
@@ -32,15 +31,19 @@
         trailing));
   }
 
+  const eyeBtn = (on, set) => h('button', { type: 'button', className: 'ff-login-eye', tabIndex: -1,
+    onClick: () => set((v) => !v), title: on ? 'Verbergen' : 'Anzeigen' }, h(Icon, { name: on ? 'eyeOff' : 'eye', size: 17 }));
+
   function LoginScreen({ onSuccess }) {
-    const [mode, setMode] = useState('login');         // 'login' | 'register'
+    const [mode, setMode] = useState('login');        // 'login' | 'register' | 'forgot'
     const [show, setShow] = useState(false);
-    const [err, setErr] = useState(null);              // { field, error }
-    const [ok, setOk] = useState(false);
-    const [hint, setHint] = useState(false);
+    const [err, setErr] = useState(null);             // { field, error }
+    const [ok, setOk] = useState(false);              // login/register success → animate then onSuccess
+    const [busy, setBusy] = useState(false);          // request in flight
+    const [info, setInfo] = useState(null);           // { kind:'confirm'|'sent', text }
 
     // login fields
-    const [email, setEmail] = useState(Auth ? Auth.get().email : '');
+    const [email, setEmail] = useState('');
     const [pw, setPw] = useState('');
     // register fields
     const [rName, setRName] = useState('');
@@ -48,32 +51,70 @@
     const [rPw, setRPw] = useState('');
     const [rPw2, setRPw2] = useState('');
     const [rSport, setRSport] = useState('');
+    // forgot field
+    const [fEmail, setFEmail] = useState('');
 
-    const finish = (res) => {
-      setErr(null); setOk(true);
-      setTimeout(() => onSuccess(res), 640);
-    };
+    const finish = (res) => { setErr(null); setBusy(false); setOk(true); setTimeout(() => onSuccess(res), 640); };
+    const fail = (res) => { setErr(res); setBusy(false); };
 
-    const submitLogin = (e) => {
-      e && e.preventDefault(); if (ok) return;
-      const res = Auth.login(email, pw);
-      if (!res.ok) { setErr(res); return; }
+    const submitLogin = async (e) => {
+      e && e.preventDefault(); if (ok || busy) return;
+      setBusy(true); setErr(null); setInfo(null);
+      const res = await Auth.login(email, pw);
+      if (!res.ok) return fail(res);
       finish(res);
     };
-    const submitRegister = (e) => {
-      e && e.preventDefault(); if (ok) return;
-      const res = Auth.register({ name: rName, email: rEmail, password: rPw, password2: rPw2, sport: rSport });
-      if (!res.ok) { setErr(res); return; }
+    const submitRegister = async (e) => {
+      e && e.preventDefault(); if (ok || busy) return;
+      setBusy(true); setErr(null); setInfo(null);
+      const res = await Auth.register({ name: rName, email: rEmail, password: rPw, password2: rPw2, sport: rSport });
+      if (!res.ok) return fail(res);
+      if (res.needConfirm) { // e-mail confirmation required → can't open the session yet
+        setBusy(false);
+        setInfo({ kind: 'confirm', text: `Wir haben dir eine Bestätigungs-Mail an ${res.email} geschickt. Bestätige sie und melde dich dann an.` });
+        setMode('login'); setEmail(rEmail); setPw('');
+        return;
+      }
       finish(res);
     };
+    const submitForgot = async (e) => {
+      e && e.preventDefault(); if (busy) return;
+      setBusy(true); setErr(null); setInfo(null);
+      const res = await Auth.resetPassword(fEmail);
+      setBusy(false);
+      if (!res.ok) return setErr(res);
+      setInfo({ kind: 'sent', text: `Falls ein Konto zu ${fEmail} existiert, haben wir dir einen Link zum Zurücksetzen geschickt.` });
+    };
 
-    const fillDemo = () => { setMode('login'); setEmail(Auth.get().email); setPw('fitflow'); setErr(null); setHint(false); };
-    const toggle = (m) => { setMode(m); setErr(null); setHint(false); };
-    const eye = (on, set) => h('button', { type: 'button', className: 'ff-login-eye', tabIndex: -1,
-      onClick: () => set((v) => !v), title: on ? 'Verbergen' : 'Anzeigen' }, h(Icon, { name: on ? 'eyeOff' : 'eye', size: 17 }));
+    const goMode = (m) => { setMode(m); setErr(null); setInfo(null); setOk(false); };
+    const fillDemo = () => { goMode('login'); setEmail(Auth ? Auth.get().email || 'julian.senfter@gmail.com' : ''); setPw('fitflow'); };
 
     const isReg = mode === 'register';
+    const isForgot = mode === 'forgot';
 
+    const infoBox = info && h('div', { className: 'ff-login-note' + (info.kind === 'sent' ? ' is-ok' : '') },
+      h(Icon, { name: info.kind === 'sent' ? 'check' : 'mail', size: 14 }), h('span', null, info.text));
+    const errBox = err && err.error && h('div', { className: 'ff-login-err' }, h(Icon, { name: 'info', size: 14 }), h('span', null, err.error));
+
+    // ---------- FORGOT PASSWORD ----------
+    if (isForgot) {
+      return h('div', { className: 'ff-login' },
+        h('div', { className: 'ff-login-scrim' }),
+        h('form', { className: 'ff-login-card', onSubmit: submitForgot, noValidate: true },
+          h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+          h('h1', { className: 'ff-login-title' }, 'Passwort zurücksetzen'),
+          h('p', { className: 'ff-login-sub' }, 'Gib deine E-Mail ein — wir schicken dir einen Link, um ein neues Passwort zu setzen.'),
+          h('div', { className: 'ff-login-fields' },
+            h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'email', value: fEmail, autoFocus: true, placeholder: 'name@beispiel.com',
+              err: err && err.field === 'email', onChange: (e) => { setFEmail(e.target.value); setErr(null); } }),
+            infoBox, errBox),
+          h('button', { type: 'submit', className: 'ff-login-submit', disabled: busy },
+            busy ? 'Senden …' : 'Link senden'),
+          h('div', { className: 'ff-login-foot' },
+            h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('login') }, '← Zurück zur Anmeldung'))));
+    }
+
+    // ---------- LOGIN / REGISTER ----------
     return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
       h('div', { className: 'ff-login-scrim' }),
       h('form', { className: 'ff-login-card', onSubmit: isReg ? submitRegister : submitLogin, noValidate: true },
@@ -84,14 +125,13 @@
           : 'Melde dich an, um deine Trainingssteuerung zu öffnen.'),
 
         isReg
-          // ---------- REGISTER ----------
           ? h('div', { className: 'ff-login-fields' },
               h(LField, { label: 'Name', icon: 'profile', value: rName, autoFocus: true, placeholder: 'Dein Name',
                 err: err && err.field === 'name', onChange: (e) => { setRName(e.target.value); setErr(null); } }),
               h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'email', value: rEmail, placeholder: 'name@beispiel.com',
                 err: err && err.field === 'email', onChange: (e) => { setREmail(e.target.value); setErr(null); } }),
               h(LField, { label: 'Passwort', icon: 'lock', type: show ? 'text' : 'password', value: rPw, placeholder: 'mind. 6 Zeichen',
-                err: err && err.field === 'password', onChange: (e) => { setRPw(e.target.value); setErr(null); }, trailing: eye(show, setShow) }),
+                err: err && err.field === 'password', onChange: (e) => { setRPw(e.target.value); setErr(null); }, trailing: eyeBtn(show, setShow) }),
               h(LField, { label: 'Passwort bestätigen', icon: 'lock', type: show ? 'text' : 'password', value: rPw2, placeholder: '••••••••',
                 err: err && err.field === 'password2', onChange: (e) => { setRPw2(e.target.value); setErr(null); } }),
               h('label', { className: 'ff-login-field' },
@@ -99,37 +139,70 @@
                 h('div', { className: 'ff-login-input' },
                   h(Icon, { name: 'target', size: 17 }),
                   h('input', { type: 'text', value: rSport, placeholder: 'z. B. Triathlon · Sub-3 Marathon', onChange: (e) => setRSport(e.target.value) }))),
-              err && err.error && h('div', { className: 'ff-login-err' }, h(Icon, { name: 'info', size: 14 }), h('span', null, err.error)))
-          // ---------- LOGIN ----------
+              errBox)
           : h('div', { className: 'ff-login-fields' },
-              h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'username', value: email, placeholder: 'name@beispiel.com',
+              h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'username', value: email, autoFocus: true, placeholder: 'name@beispiel.com',
                 err: err && err.field === 'email', onChange: (e) => { setEmail(e.target.value); setErr(null); } }),
               h(LField, { label: 'Passwort', icon: 'lock', type: show ? 'text' : 'password', autoComplete: 'current-password', value: pw, placeholder: '••••••••',
-                err: err && err.field === 'password', onChange: (e) => { setPw(e.target.value); setErr(null); }, trailing: eye(show, setShow),
-                right: h('button', { type: 'button', className: 'ff-login-forgot', onClick: () => setHint((v) => !v) }, 'Passwort vergessen?') }),
-              hint && h('div', { className: 'ff-login-note' },
-                h(Icon, { name: 'info', size: 14 }),
-                h('span', null, 'Demo-Konto — Passwort ', h('strong', null, 'fitflow'), '. ',
-                  h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Automatisch einsetzen'))),
-              err && err.error && h('div', { className: 'ff-login-err' }, h(Icon, { name: 'info', size: 14 }), h('span', null, err.error))),
+                err: err && err.field === 'password', onChange: (e) => { setPw(e.target.value); setErr(null); }, trailing: eyeBtn(show, setShow),
+                right: h('button', { type: 'button', className: 'ff-login-forgot', onClick: () => goMode('forgot') }, 'Passwort vergessen?') }),
+              infoBox, errBox),
 
-        h('button', { type: 'submit', className: 'ff-login-submit' + (ok ? ' is-ok' : ''), disabled: ok },
+        h('button', { type: 'submit', className: 'ff-login-submit' + (ok ? ' is-ok' : ''), disabled: ok || busy },
           ok ? h(Icon, { name: 'check', size: 18 }) : null,
-          ok ? (isReg ? 'Konto erstellt' : 'Angemeldet') : (isReg ? 'Konto erstellen' : 'Anmelden')),
+          ok ? (isReg ? 'Konto erstellt' : 'Angemeldet') : busy ? (isReg ? 'Konto wird erstellt …' : 'Anmelden …') : (isReg ? 'Konto erstellen' : 'Anmelden')),
 
         h('div', { className: 'ff-login-or' }, h('span', null, 'oder')),
-
         h('div', { className: 'ff-login-social' },
           h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandApple), 'Apple'),
           h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandGoogle), 'Google')),
+        h('div', { className: 'ff-login-demo' },
+          h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)')),
 
         h('div', { className: 'ff-login-foot' }, isReg
-          ? h(Fragment2, null, 'Schon ein Konto? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => toggle('login') }, 'Anmelden'))
-          : h(Fragment2, null, 'Neu hier? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => toggle('register') }, 'Konto erstellen')))));
+          ? h(Fragment, null, 'Schon ein Konto? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('login') }, 'Anmelden'))
+          : h(Fragment, null, 'Neu hier? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('register') }, 'Konto erstellen')))));
   }
 
-  // tiny fragment helper to avoid pulling Fragment into deps above
-  function Fragment2(props) { return h(React.Fragment, null, props.children); }
+  /* Shown by Root when the user returns via a password-reset link
+     (Supabase fired PASSWORD_RECOVERY). Sets a new password, then continues. */
+  function ResetPasswordScreen({ onDone }) {
+    const { useState } = React;
+    const [pw, setPw] = useState('');
+    const [pw2, setPw2] = useState('');
+    const [show, setShow] = useState(false);
+    const [err, setErr] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [ok, setOk] = useState(false);
+
+    const submit = async (e) => {
+      e && e.preventDefault(); if (busy || ok) return;
+      if (pw.length < 6) return setErr({ error: 'Das neue Passwort braucht mindestens 6 Zeichen.' });
+      if (pw !== pw2) return setErr({ error: 'Die Passwörter stimmen nicht überein.' });
+      setBusy(true); setErr(null);
+      const res = await Auth.updatePassword(pw);
+      if (!res.ok) { setBusy(false); return setErr(res); }
+      setBusy(false); setOk(true);
+      setTimeout(() => onDone && onDone(), 800);
+    };
+
+    return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
+      h('div', { className: 'ff-login-scrim' }),
+      h('form', { className: 'ff-login-card', onSubmit: submit, noValidate: true },
+        h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+        h('h1', { className: 'ff-login-title' }, 'Neues Passwort setzen'),
+        h('p', { className: 'ff-login-sub' }, 'Wähle ein neues Passwort für dein Konto.'),
+        h('div', { className: 'ff-login-fields' },
+          h(LField, { label: 'Neues Passwort', icon: 'lock', type: show ? 'text' : 'password', value: pw, autoFocus: true, placeholder: 'mind. 6 Zeichen',
+            onChange: (e) => { setPw(e.target.value); setErr(null); }, trailing: eyeBtn(show, setShow) }),
+          h(LField, { label: 'Passwort bestätigen', icon: 'lock', type: show ? 'text' : 'password', value: pw2, placeholder: '••••••••',
+            onChange: (e) => { setPw2(e.target.value); setErr(null); } }),
+          err && err.error && h('div', { className: 'ff-login-err' }, h(Icon, { name: 'info', size: 14 }), h('span', null, err.error))),
+        h('button', { type: 'submit', className: 'ff-login-submit' + (ok ? ' is-ok' : ''), disabled: busy || ok },
+          ok ? h(Icon, { name: 'check', size: 18 }) : null,
+          ok ? 'Passwort geändert' : busy ? 'Speichern …' : 'Passwort speichern')));
+  }
 
   window.LoginScreen = LoginScreen;
+  window.ResetPasswordScreen = ResetPasswordScreen;
 })();

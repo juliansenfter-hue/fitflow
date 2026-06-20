@@ -429,6 +429,13 @@
     }, []);
     if (phase === 'loading') return h(BootSplash, { label: API && API.mode === 'live' ? 'Mit Backend verbinden …' : 'Daten werden geladen …' });
     if (phase === 'error') return h(BootError, { err, onRetry: run, onMock: () => { API.useMock(); run(); } });
+    // wait for the first Supabase session check before deciding login vs app (kein Login-Flash)
+    if (Auth && !Auth.isReady()) return h(BootSplash, { label: 'Sitzung wird geprüft …' });
+    // arrived via a password-reset link → let the user set a new password
+    if (Auth && Auth.isRecovery && Auth.isRecovery()) {
+      const Reset = window.ResetPasswordScreen;
+      if (Reset) return h(Reset, { onDone: () => bump((n) => n + 1) });
+    }
     // gated: blurred dashboard teaser (always demo data) behind the login card
     if (Auth && !authed) {
       if (Acct) Acct.apply(false, null);

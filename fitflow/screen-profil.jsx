@@ -422,10 +422,10 @@
     const Auth = window.FFAuth;
     const [val, setVal] = useState(current);
     const [err, setErr] = useState(null);
-    const save = () => {
-      const res = Auth.changeEmail(val);
+    const save = async () => {
+      const res = await Auth.changeEmail(val);
       if (!res.ok) { setErr(res.error); return; }
-      onSaved('E-Mail-Adresse geändert.');
+      onSaved(res.pending ? 'Bestätigungs-Mail an die neue Adresse geschickt — nach dem Klick ist sie aktiv.' : 'E-Mail-Adresse geändert.');
     };
     return h('div', { className: 'ff-acct-edit' },
       h(Field, { label: 'Neue E-Mail-Adresse' },
@@ -445,9 +445,9 @@
     const [conf, setConf] = useState('');
     const [show, setShow] = useState(false);
     const [err, setErr] = useState(null);   // { field, error }
-    const save = () => {
+    const save = async () => {
       if (next !== conf) { setErr({ field: 'conf', error: 'Die Passwörter stimmen nicht überein.' }); return; }
-      const res = Auth.changePassword(cur, next);
+      const res = await Auth.changePassword(cur, next);
       if (!res.ok) { setErr(res); return; }
       onSaved();
     };

@@ -972,6 +972,8 @@ html.is-touch .pl-main{min-height:0}
 .ff-login-note{color:var(--text-2);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09)}
 .ff-login-note svg{color:var(--accent-bright);flex-shrink:0;margin-top:1px}
 .ff-login-note strong{color:#fff;font-family:var(--font-mono);letter-spacing:.02em}
+.ff-login-note.is-ok{color:#c8f5d8;background:color-mix(in srgb,var(--good) 14%,transparent);border-color:color-mix(in srgb,var(--good) 30%,transparent)}
+.ff-login-note.is-ok svg{color:var(--good)}
 .ff-login-err{color:#ffd9d5;background:color-mix(in srgb,var(--bad) 14%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)}
 .ff-login-err svg{color:var(--bad);flex-shrink:0;margin-top:1px}
 .ff-login-link{background:none;border:0;padding:0;cursor:pointer;font-family:inherit;font-weight:600;
@@ -996,6 +998,7 @@ html.is-touch .pl-main{min-height:0}
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
   transition:background .2s var(--ease),border-color .2s var(--ease)}
 .ff-login-soc:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.2)}
+.ff-login-demo{margin-top:14px;text-align:center;font-size:12.5px}
 .ff-login-foot{margin-top:20px;text-align:center;font-size:12.5px;color:var(--text-3)}
 
 @media (max-width:480px){
