@@ -51,8 +51,10 @@
     const [rPw, setRPw] = useState('');
     const [rPw2, setRPw2] = useState('');
     const [rSport, setRSport] = useState('');
-    // forgot field
+    // forgot fields (E-Mail → 6-stelliger Code → [Root] neues Passwort)
     const [fEmail, setFEmail] = useState('');
+    const [fStep, setFStep] = useState('email');      // 'email' | 'code'
+    const [fCode, setFCode] = useState('');
 
     const finish = (res) => { setErr(null); setBusy(false); setOk(true); setTimeout(() => onSuccess(res), 640); };
     const fail = (res) => { setErr(res); setBusy(false); };
@@ -83,10 +85,19 @@
       const res = await Auth.resetPassword(fEmail);
       setBusy(false);
       if (!res.ok) return setErr(res);
-      setInfo({ kind: 'sent', text: `Falls ein Konto zu ${fEmail} existiert, haben wir dir einen Link zum Zurücksetzen geschickt.` });
+      setFStep('code');
+      setInfo({ kind: 'sent', text: `Falls ein Konto zu ${fEmail} existiert, kommt gleich ein 6-stelliger Code per E-Mail.` });
+    };
+    const submitCode = async (e) => {
+      e && e.preventDefault(); if (busy) return;
+      setBusy(true); setErr(null);
+      const res = await Auth.verifyResetCode(fEmail, fCode);
+      if (!res.ok) { setBusy(false); return setErr(res); }
+      // Code ok → Recovery-Session offen; Root zeigt jetzt den „Neues Passwort"-Screen
     };
 
-    const goMode = (m) => { setMode(m); setErr(null); setInfo(null); setOk(false); };
+    const goMode = (m) => { setMode(m); setErr(null); setInfo(null); setOk(false);
+      if (m === 'forgot') { setFStep('email'); setFCode(''); } };
     const fillDemo = () => { goMode('login'); setEmail(Auth ? Auth.get().email || 'julian.senfter@gmail.com' : ''); setPw('fitflow'); };
 
     const isReg = mode === 'register';
@@ -96,22 +107,30 @@
       h(Icon, { name: info.kind === 'sent' ? 'check' : 'mail', size: 14 }), h('span', null, info.text));
     const errBox = err && err.error && h('div', { className: 'ff-login-err' }, h(Icon, { name: 'info', size: 14 }), h('span', null, err.error));
 
-    // ---------- FORGOT PASSWORD ----------
+    // ---------- FORGOT PASSWORD (E-Mail → 6-stelliger Code) ----------
     if (isForgot) {
+      const isCode = fStep === 'code';
       return h('div', { className: 'ff-login' },
         h('div', { className: 'ff-login-scrim' }),
-        h('form', { className: 'ff-login-card', onSubmit: submitForgot, noValidate: true },
+        h('form', { className: 'ff-login-card', onSubmit: isCode ? submitCode : submitForgot, noValidate: true },
           h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
-          h('h1', { className: 'ff-login-title' }, 'Passwort zurücksetzen'),
-          h('p', { className: 'ff-login-sub' }, 'Gib deine E-Mail ein — wir schicken dir einen Link, um ein neues Passwort zu setzen.'),
+          h('h1', { className: 'ff-login-title' }, isCode ? 'Code eingeben' : 'Passwort zurücksetzen'),
+          h('p', { className: 'ff-login-sub' }, isCode
+            ? `Gib den 6-stelligen Code ein, den wir an ${fEmail} geschickt haben.`
+            : 'Gib deine E-Mail ein — wir schicken dir einen 6-stelligen Code zum Zurücksetzen.'),
           h('div', { className: 'ff-login-fields' },
-            h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'email', value: fEmail, autoFocus: true, placeholder: 'name@beispiel.com',
-              err: err && err.field === 'email', onChange: (e) => { setFEmail(e.target.value); setErr(null); } }),
+            isCode
+              ? h(LField, { label: 'Code', icon: 'lock', type: 'text', value: fCode, autoFocus: true, placeholder: '123456', autoComplete: 'one-time-code',
+                  err: err && !!err.error, onChange: (e) => { setFCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setErr(null); } })
+              : h(LField, { label: 'E-Mail', icon: 'mail', type: 'email', autoComplete: 'email', value: fEmail, autoFocus: true, placeholder: 'name@beispiel.com',
+                  err: err && err.field === 'email', onChange: (e) => { setFEmail(e.target.value); setErr(null); } }),
             infoBox, errBox),
-          h('button', { type: 'submit', className: 'ff-login-submit', disabled: busy },
-            busy ? 'Senden …' : 'Link senden'),
+          h('button', { type: 'submit', className: 'ff-login-submit', disabled: busy || (isCode && fCode.length < 6) },
+            busy ? (isCode ? 'Prüfen …' : 'Senden …') : (isCode ? 'Code bestätigen' : 'Code senden')),
           h('div', { className: 'ff-login-foot' },
-            h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('login') }, '← Zurück zur Anmeldung'))));
+            h('button', { type: 'button', className: 'ff-login-link',
+              onClick: () => { if (isCode) { setFStep('email'); setErr(null); setInfo(null); } else goMode('login'); } },
+              isCode ? '← E-Mail ändern' : '← Zurück zur Anmeldung'))));
     }
 
     // ---------- LOGIN / REGISTER ----------

@@ -180,6 +180,16 @@
         });
     },
 
+    /* 6-stelligen Reset-Code aus der E-Mail prüfen → eröffnet eine Recovery-Session */
+    verifyResetCode: function (email, code) {
+      var n = need(); if (n) return Promise.resolve(n);
+      return client.auth.verifyOtp({ email: String(email).trim(), token: String(code || '').replace(/\s/g, ''), type: 'recovery' }).then(function (res) {
+        if (res.error) return { ok: false, error: 'Code ist falsch oder abgelaufen.' };
+        demo = false; user = res.data.user; recovery = true; emit();
+        return { ok: true };
+      });
+    },
+
     /* set a new password for the recovered/logged-in session (reset-link return) */
     updatePassword: function (next) {
       if (String(next).length < 6) return Promise.resolve({ ok: false, field: 'next', error: 'Das neue Passwort braucht mindestens 6 Zeichen.' });
