@@ -34,6 +34,33 @@
   will-change:transform,opacity;
   animation:ff-breathe 4.6s var(--ease) infinite}
 .ff-vital-pulse.is-heart::before{animation:ff-heartbeat 1.15s ease-in-out infinite}
+/* manuelles Vital-Eingabefeld am unteren Rand der Kachel */
+.ff-vital-manual{display:flex;align-items:center;gap:6px;margin-top:12px}
+.ff-vital-input{
+  flex:1;min-width:0;height:30px;padding:0 11px;
+  font-family:var(--font-sans);font-size:12px;font-weight:500;letter-spacing:-.01em;
+  color:var(--text);background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.10);border-radius:9px;
+  outline:none;transition:border-color .15s var(--ease),background .15s var(--ease)}
+.ff-vital-input::placeholder{color:var(--text-4)}
+.ff-vital-input:focus{border-color:var(--accent);background:rgba(255,255,255,.08)}
+.ff-vital-clear{
+  flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:9px;color:var(--text-4);cursor:pointer;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  transition:color .15s var(--ease),background .15s var(--ease)}
+.ff-vital-clear:hover{color:var(--text-2);background:rgba(255,255,255,.09)}
+/* Trainingsfokus — schlanke Verlaufs-Balken je Intensitätsbereich */
+.ff-fokus-track{
+  height:9px;border-radius:99px;overflow:hidden;position:relative;
+  background:rgba(255,255,255,.05);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+.ff-fokus-fill{
+  height:100%;border-radius:inherit;min-width:9px;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--fc) 45%,transparent),var(--fc) 85%);
+  box-shadow:0 0 14px -3px color-mix(in srgb,var(--fc) 70%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.25);
+  transition:width .9s var(--ease)}
 @keyframes ff-breathe{
   0%,100%{transform:translate(-50%,-50%) scale(.8);opacity:.10}
   50%{transform:translate(-50%,-50%) scale(1.05);opacity:.24}
@@ -1475,6 +1502,8 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 /* day timeline */
 .pl-view{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
 .pl-main{min-height:660px;display:flex;flex-direction:column}
+/* Wochenkalender: Höhe folgt dem Inhalt statt an die Sidebar gestreckt zu werden */
+.pl-main--week{min-height:0}
 .pl-main>.panel-pad{flex:1;display:flex;flex-direction:column;min-height:0}
 .pl-tl{position:relative;display:grid;grid-template-columns:54px 1fr;gap:0}
 .pl-tl-axis{position:relative}

@@ -3,3 +3,7 @@ screenshots/
 uploads/
 _ds/
 .thumbnail
+
+# macOS / lokale Tool-Configs
+.DS_Store
+.claude/
