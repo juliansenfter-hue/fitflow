@@ -59,6 +59,9 @@
     client = SB.createClient(CFG.url, CFG.anonKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
     });
+    // expose the configured client so the data layer (FFImports cloud sync) can
+    // read/write the user's own rows under RLS. null when no backend is set up.
+    window.FFSupabase = client;
     client.auth.onAuthStateChange(function (event, session) {
       if (event === 'PASSWORD_RECOVERY') recovery = true;
       // a real Supabase session always wins over the local bypasses

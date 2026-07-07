@@ -425,7 +425,17 @@
       if (!Auth) return;
       // bump on every auth change (login/logout AND markOnboarded) so Root
       // re-applies the active account's dataset and the screen swaps.
-      return Auth.subscribe((s) => { setAuthed(!!s.loggedIn); bump((n) => n + 1); });
+      return Auth.subscribe((s) => {
+        setAuthed(!!s.loggedIn); bump((n) => n + 1);
+        // real account (re)connected → pull cloud-synced imports in the
+        // background, then re-render if the local cache changed (cross-device).
+        if (s.loggedIn && window.FFImports && window.FFImports.isCloud) {
+          const acc = Auth.currentAccount && Auth.currentAccount();
+          if (window.FFImports.isCloud(acc)) {
+            window.FFImports.pullCloud(acc).then((changed) => { if (changed) bump((n) => n + 1); });
+          }
+        }
+      });
     }, []);
     if (phase === 'loading') return h(BootSplash, { label: API && API.mode === 'live' ? 'Mit Backend verbinden …' : 'Daten werden geladen …' });
     if (phase === 'error') return h(BootError, { err, onRetry: run, onMock: () => { API.useMock(); run(); } });
