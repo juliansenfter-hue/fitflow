@@ -104,7 +104,7 @@
 
   function Diagnostik({ activity, setActivity, onNav }) {
     if (FF.empty) return h(EmptyState, { icon: 'activity', title: 'Noch keine Diagnostik-Daten',
-      body: 'Importiere eine Aktivität mit Herzfrequenz-, Power- oder Pace-Daten, um Leistungs- und Einheiten-Analysen zu sehen.',
+      body: 'Importiere eine Aktivität mit Herzfrequenz-, Power- oder Pace-Daten, um Leistungs- und Aktivitäten-Analysen zu sehen.',
       cta: 'Aktivität importieren', onCta: () => onNav && onNav('import') });
     const [mode, setMode] = useState('einheiten'); // einheiten | load
     const [filter, setFilter] = useState('all');
@@ -136,7 +136,7 @@
 
     return h('div', { className: 'col gap-18' },
       h('div', { className: 'row between center wrap gap-12' },
-        h(Tabs, { items: [{ value: 'einheiten', label: 'Einheiten' }, { value: 'load', label: 'Trainingsload' }], value: mode, onChange: setMode }),
+        h(Tabs, { items: [{ value: 'einheiten', label: 'Aktivitäten' }, { value: 'load', label: 'Trainingsload' }], value: mode, onChange: setMode }),
         mode === 'einheiten' && h('div', { className: 'row center gap-10' },
           h('div', { className: 'seg' }, [['all', 'Alle'], ['bike', 'Rad'], ['run', 'Lauf'], ['lift', 'Kraft']].map(([v, l]) =>
             h('button', { key: v, className: filter === v ? 'is-active' : '', onClick: () => setFilter(v) }, l))),
@@ -146,7 +146,7 @@
       mode === 'load'
         ? h(LoadView, { weekly, tl, rampRate, ramp6 })
         : h('div', { className: 'ff-grid', style: { gridTemplateColumns: '340px minmax(0,1fr)', gap: 18, alignItems: 'start' }, 'data-diag': true },
-          h(Card, { title: `Einheiten`, icon: 'activity', pad: false,
+          h(Card, { title: `Aktivitäten`, icon: 'activity', pad: false,
             right: h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--text-3)' } }, `${acts.length}`) },
             h('div', { className: 'col', style: { padding: '4px 8px 8px', maxHeight: 660, overflowY: 'auto' } },
               acts.map((a) => {
@@ -162,7 +162,7 @@
           h(Card, { pad: true },
             compare
               ? (cmpList.length >= 2 ? h(Compare, { list: cmpList })
-                : h('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text-3)' } }, h(Icon, { name: 'layers', size: 28 }), h('div', { style: { marginTop: 12 } }, 'Wähle 2–3 Einheiten zum Vergleich')))
+                : h('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text-3)' } }, h(Icon, { name: 'layers', size: 28 }), h('div', { style: { marginTop: 12 } }, 'Wähle 2–3 Aktivitäten zum Vergleich')))
               : h(Detail, { a: FF.activities.find((a) => a.id === current) || FF.activities[0] }))));
   }
 

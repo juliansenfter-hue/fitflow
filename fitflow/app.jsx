@@ -87,7 +87,7 @@
     jahr: { t: 'Jahres Übersicht', s: () => 'Saison 2026 · Periodisierung & Trainingsfokus' },
     prognose: { t: 'Form-Prognose', s: () => 'TSB-Projektion & Taper-Optimierung bis zum Zielwettkampf' },
     woche: { t: 'Planung', s: () => 'KI-Empfehlung für die kommende Woche' },
-    diag: { t: 'Leistungsdiagnostik', s: () => 'Telemetrie, Trainingsload & Einheiten-Vergleich' },
+    diag: { t: 'Leistungsdiagnostik', s: () => 'Telemetrie, Trainingsload & Aktivitäten-Vergleich' },
     import: { t: 'Import & Sync', s: () => 'FIT / CSV Import · Strava · Apple Health' },
     design: { t: 'Design', s: () => 'Hintergrund, Material & Form der Oberfläche' },
     profil: { t: 'Profileinstellungen', s: () => 'Persönliche Daten, HF- & Leistungszonen' },
