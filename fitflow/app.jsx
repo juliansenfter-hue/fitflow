@@ -2,7 +2,7 @@
 (function () {
   const { createElement: h, useState, useEffect, useRef, Fragment } = React;
   const UI = window.UI;
-  const { Shell, Topbar, SportIcon, AnimatedWordmark } = UI;
+  const { Shell, Topbar, SportIcon, AnimatedWordmark, BrandLogo } = UI;
   const Icon = window.Icon;
   const S = window.Screens;
   const { useTweaks, TweaksPanel, TweakSection, TweakColor,
@@ -371,7 +371,7 @@
       h('div', { className: 'ff-intro-cover' }),
       h('div', { className: 'ff-intro-scrim' }),
       h('div', { className: 'ff-intro-logo', ref: floatRef },
-        h(AnimatedWordmark, { text: 'FitFlow', replayKey: 'intro' })));
+        h(BrandLogo, { replayKey: 'intro' })));
   }
 
   function BootSplash({ label }) {
@@ -449,9 +449,13 @@
       const Onb = window.OnboardingFlow;
       if (Onb) return h(Onb, { account: Auth.currentAccount(), onDone: () => bump((n) => n + 1) });
     }
-    // authed + onboarded: load the active account's dataset (demo = full)
-    if (Acct) Acct.apply(Auth ? Auth.isEmptyAccount() : false, Auth ? Auth.currentAccount() : null);
+    // authed + onboarded: load the active account's dataset.
+    // Nur das DEMO-Konto zeigt den vollen Beispiel-Datensatz. Ein echtes
+    // (registriertes) Konto bleibt IMMER leer — auch nach dem Onboarding —
+    // bis der Nutzer selbst den ersten Eintrag anlegt.
     const acc = Auth ? Auth.currentAccount() : null;
+    const isEmpty = acc ? !acc.demo : false;
+    if (Acct) Acct.apply(isEmpty, acc);
     return h(App, { key: acc ? acc.email : 'live' });
   }
 

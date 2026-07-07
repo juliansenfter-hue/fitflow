@@ -20,7 +20,7 @@
     return {
       name: acc.name || '', initials: initials(acc.name),
       role: acc.sport ? acc.sport : 'Neues Profil',
-      age: '', height: '', weight: '', sex: '',
+      age: acc.age || '', height: acc.height || '', weight: acc.weight || '', sex: acc.sex || '',
       ftp: '', vo2max: '', thrHr: '', maxHr: '', restHr: '', runThrPace: '',
       plan: 'FREE', email: acc.email || '', goal: acc.goal || '',
     };

@@ -309,13 +309,12 @@
 
     return h('div', { className: 'pl-view' },
       h(Card, {
-        className: 'pl-main', title: `Kalenderwoche · KW ${kw}`, icon: 'calendar',
-        style: { alignSelf: 'stretch' },
+        className: 'pl-main pl-main--week', title: `Kalenderwoche · KW ${kw}`, icon: 'calendar',
         right: h('div', { className: 'row center gap-8' },
           h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'flame', size: 12 }), 'Load · Polarisiert')),
       },
-        h('div', { className: 'ff-week-scroll', style: { flex: 1 } },
-          h('div', { className: 'ff-week-grid', style: { minHeight: 480, height: '100%' } }, days.map((d, di) => {
+        h('div', { className: 'ff-week-scroll' },
+          h('div', { className: 'ff-week-grid' }, days.map((d, di) => {
             const dayTss = d.items.reduce((s, it) => s + it.tss, 0);
             const isSel = di === selDay;
             return h('div', {
@@ -347,7 +346,7 @@
         h('div', { className: 'row center gap-6', style: { marginTop: 12, justifyContent: 'center', fontSize: 10.5, color: 'var(--text-4)' } },
           h(Icon, { name: 'info', size: 11 }), 'Einheit ziehen, um sie auf einen anderen Tag zu verschieben · Tag anklicken für die Zeitstrahl-Ansicht')),
 
-      h('div', { className: 'col', style: { gap: 30, alignSelf: 'stretch', justifyContent: 'space-between' } },
+      h('div', { className: 'col', style: { gap: 18, alignSelf: 'start' } },
         h(Card, { title: 'KI-Empfehlung', icon: 'spark' },
           h('div', { className: 'col gap-14' },
             h('div', { className: 'row between center' },

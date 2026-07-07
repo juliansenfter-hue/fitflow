@@ -198,6 +198,12 @@
       h('span', { className: 'ff-wm-underline', 'aria-hidden': true, style: { '--n': letters.length } }));
   }
 
+  /* Bild-Logo (ersetzt den Text-Schriftzug) — F-Mark + FITFLOW als PNG */
+  function BrandLogo({ replayKey }) {
+    return h('img', { className: 'ff-brandlogo', key: replayKey, src: 'fitflow/logo-mark.png',
+      alt: 'FitFlow', draggable: false });
+  }
+
   function Sidebar({ current, onNav, onClose }) {
     const a = FF.athlete;
     /* replay the wordmark animation on first mount and every time the
@@ -211,7 +217,7 @@
     return h('aside', { className: 'ff-sidebar panel' },
       h('div', { className: 'ff-brand' },
         h('div', { className: 'ff-logo' },
-          h(AnimatedWordmark, { text: 'FitFlow', replayKey: logoKey })),
+          h(BrandLogo, { replayKey: logoKey })),
         onClose && h('button', { className: 'btn btn--icon btn--sm btn--ghost ff-only-mobile', onClick: onClose }, h(Icon, { name: 'x', size: 16 }))),
       h('nav', { className: 'ff-nav-list' }, NAV.map((grp) =>
         h('div', { key: grp.group, className: 'col gap-4', style: { marginBottom: 18 } },
@@ -255,5 +261,5 @@
         h('div', { className: 'ff-content', key: current === 'dashboard' ? 'dashboard' : 'inner' }, children)));
   }
 
-  window.UI = { Shell, Topbar, Sidebar, Card, Stat, Avatar, SportIcon, SportTag, Delta, Tabs, AiInsight, AnimatedWordmark, LiquidF, EmptyState, SPORT, NAV };
+  window.UI = { Shell, Topbar, Sidebar, Card, Stat, Avatar, SportIcon, SportTag, Delta, Tabs, AiInsight, AnimatedWordmark, BrandLogo, LiquidF, EmptyState, SPORT, NAV };
 })();

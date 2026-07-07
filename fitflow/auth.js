@@ -34,6 +34,7 @@
   var recovery = false;    // arrived via a password-reset link?
   var demo = false;        // local demo bypass active?
   var user = null;         // current Supabase user object (or null)
+  var testUser = null;     // local „neues, leeres Konto"-Testbypass (keine echte Mail nötig)
 
   function emit() {
     var s = Auth.get();
@@ -60,8 +61,8 @@
     });
     client.auth.onAuthStateChange(function (event, session) {
       if (event === 'PASSWORD_RECOVERY') recovery = true;
-      // a real Supabase session always wins over the local demo bypass
-      if (session && session.user) demo = false;
+      // a real Supabase session always wins over the local bypasses
+      if (session && session.user) { demo = false; testUser = null; }
       user = session ? session.user : null;
       setReady();
     });
@@ -99,11 +100,16 @@
     isReady: function () { return ready; },
     isConfigured: function () { return !!client; },
     isRecovery: function () { return recovery; },
-    isLoggedIn: function () { return demo || !!user; },
-    isEmptyAccount: function () { if (demo) return false; return !!(user && !isOnboarded(user)); },
+    isLoggedIn: function () { return demo || !!testUser || !!user; },
+    isEmptyAccount: function () {
+      if (demo) return false;
+      if (testUser) return !testUser.onboarded;
+      return !!(user && !isOnboarded(user));
+    },
 
     get: function () {
       if (demo) return { email: DEMO.email, name: DEMO.name, loggedIn: true, empty: false, demo: true };
+      if (testUser) return { email: testUser.email, name: testUser.name, loggedIn: true, empty: !testUser.onboarded, demo: false, test: true };
       return {
         email: user ? user.email : '',
         name: nameOf(user),
@@ -114,6 +120,15 @@
     },
     currentAccount: function () {
       if (demo) return { name: DEMO.name, email: DEMO.email, sport: 'Ausdauer', goal: '', empty: false, demo: true, initials: initials(DEMO.name) };
+      if (testUser) {
+        var tm = testUser.meta || {};
+        return {
+          name: testUser.name, email: testUser.email,
+          sport: tm.sport || '', goal: tm.goal || '',
+          height: tm.height || '', weight: tm.weight || '', age: tm.age || '', sex: tm.sex || '',
+          empty: !testUser.onboarded, demo: false, test: true, initials: initials(testUser.name),
+        };
+      }
       var m = (user && user.user_metadata) || {};
       return {
         name: nameOf(user), email: user ? user.email : '',
@@ -238,9 +253,19 @@
       });
     },
 
+    /* lokaler Test: frisches, leeres Konto simulieren → Onboarding + Video + leeres Dashboard,
+       ganz ohne echte E-Mail / Supabase. */
+    loginTest: function () {
+      demo = false; user = null; recovery = false;
+      testUser = { name: 'Test-Konto', email: 'test@fitflow.local', onboarded: false, meta: {} };
+      emit();
+      return Promise.resolve({ ok: true, registered: true, empty: true, test: true });
+    },
+
     /* Onboarding-Wizard: Profilfelder + onboarded:true in user_metadata speichern */
     completeOnboarding: function (profile) {
       profile = profile || {};
+      if (testUser) { testUser.meta = Object.assign({}, testUser.meta, profile); testUser.onboarded = true; emit(); return Promise.resolve({ ok: true }); }
       if (demo) return Promise.resolve({ ok: true });
       if (!client || !user) return Promise.resolve({ ok: false });
       var data = Object.assign({}, profile, { onboarded: true });
@@ -251,7 +276,7 @@
     },
 
     logout: function () {
-      demo = false; recovery = false;
+      demo = false; recovery = false; testUser = null;
       if (!client) { user = null; emit(); return Promise.resolve(); }
       return client.auth.signOut().then(function () { user = null; emit(); });
     },
@@ -259,6 +284,7 @@
     /* best-effort self-delete: needs a `delete_user` RPC in Supabase (optional);
        falls back to signing out so the account is at least left. */
     deleteAccount: function () {
+      if (testUser) { testUser = null; emit(); return Promise.resolve(); }
       if (demo) { demo = false; emit(); return Promise.resolve(); }
       if (!client) { user = null; emit(); return Promise.resolve(); }
       return client.rpc('delete_user').catch(function () { /* RPC not set up — ignore */ })

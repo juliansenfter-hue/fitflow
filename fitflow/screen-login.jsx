@@ -99,6 +99,11 @@
     const goMode = (m) => { setMode(m); setErr(null); setInfo(null); setOk(false);
       if (m === 'forgot') { setFStep('email'); setFCode(''); } };
     const fillDemo = () => { goMode('login'); setEmail(Auth ? Auth.get().email || 'julian.senfter@gmail.com' : ''); setPw('fitflow'); };
+    const startTest = async () => {
+      if (ok || busy) return;
+      setErr(null); setInfo(null);
+      if (Auth && Auth.loginTest) { const res = await Auth.loginTest(); finish(res); }
+    };
 
     const isReg = mode === 'register';
     const isForgot = mode === 'forgot';
@@ -176,7 +181,9 @@
           h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandApple), 'Apple'),
           h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandGoogle), 'Google')),
         h('div', { className: 'ff-login-demo' },
-          h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)')),
+          h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)'),
+          h('span', { className: 'ff-login-demo-sep', 'aria-hidden': true }, '\u00b7'),
+          h('button', { type: 'button', className: 'ff-login-link', onClick: startTest }, 'Onboarding testen (leeres Konto)')),
 
         h('div', { className: 'ff-login-foot' }, isReg
           ? h(Fragment, null, 'Schon ein Konto? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('login') }, 'Anmelden'))

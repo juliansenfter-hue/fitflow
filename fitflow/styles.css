@@ -34,6 +34,33 @@
   will-change:transform,opacity;
   animation:ff-breathe 4.6s var(--ease) infinite}
 .ff-vital-pulse.is-heart::before{animation:ff-heartbeat 1.15s ease-in-out infinite}
+/* manuelles Vital-Eingabefeld am unteren Rand der Kachel */
+.ff-vital-manual{display:flex;align-items:center;gap:6px;margin-top:12px}
+.ff-vital-input{
+  flex:1;min-width:0;height:30px;padding:0 11px;
+  font-family:var(--font-sans);font-size:12px;font-weight:500;letter-spacing:-.01em;
+  color:var(--text);background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.10);border-radius:9px;
+  outline:none;transition:border-color .15s var(--ease),background .15s var(--ease)}
+.ff-vital-input::placeholder{color:var(--text-4)}
+.ff-vital-input:focus{border-color:var(--accent);background:rgba(255,255,255,.08)}
+.ff-vital-clear{
+  flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:9px;color:var(--text-4);cursor:pointer;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  transition:color .15s var(--ease),background .15s var(--ease)}
+.ff-vital-clear:hover{color:var(--text-2);background:rgba(255,255,255,.09)}
+/* Trainingsfokus — schlanke Verlaufs-Balken je Intensitätsbereich */
+.ff-fokus-track{
+  height:9px;border-radius:99px;overflow:hidden;position:relative;
+  background:rgba(255,255,255,.05);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+.ff-fokus-fill{
+  height:100%;border-radius:inherit;min-width:9px;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--fc) 45%,transparent),var(--fc) 85%);
+  box-shadow:0 0 14px -3px color-mix(in srgb,var(--fc) 70%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.25);
+  transition:width .9s var(--ease)}
 @keyframes ff-breathe{
   0%,100%{transform:translate(-50%,-50%) scale(.8);opacity:.10}
   50%{transform:translate(-50%,-50%) scale(1.05);opacity:.24}
@@ -361,6 +388,12 @@ body::after{
 .ff-logo-mark svg{display:block;overflow:visible}
 @keyframes ff-logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.ff-logo-mark{animation:none}}
+/* Bild-Logo im Brand-Slot (Sidebar + Intro) */
+.ff-brandlogo{width:158px;height:auto;display:block;user-select:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 10px 26px var(--accent-glow)) drop-shadow(0 2px 6px rgba(0,0,0,.45));
+  animation:ff-logo-float 7s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ff-brandlogo{animation:none}}
+.ff-intro-logo .ff-brandlogo{width:min(340px,60vw);animation:none}
 .ff-wordmark{font-family:var(--font-sans);font-size:31px;font-weight:800;letter-spacing:-.01em;
   line-height:1;text-transform:uppercase;
   background:linear-gradient(115deg,var(--text) 38%,var(--accent-bright));
@@ -823,6 +856,12 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 .ff-ck-opt.on[data-tone=good]{background:color-mix(in srgb,var(--good) 82%,#000);color:#fff}
 .ff-ck-opt.on[data-tone=mid]{background:rgba(255,255,255,.18);color:var(--text)}
 .ff-ck-opt.on[data-tone=bad]{background:color-mix(in srgb,var(--bad) 82%,#000);color:#fff}
+.ff-ck-note{width:100%;box-sizing:border-box;resize:vertical;min-height:52px;
+  font-family:var(--font-sans);font-size:12.5px;line-height:1.45;letter-spacing:-.01em;
+  color:var(--text);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:10px;padding:9px 12px;transition:border-color .2s var(--ease),background .2s var(--ease)}
+.ff-ck-note::placeholder{color:var(--text-4)}
+.ff-ck-note:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:rgba(255,255,255,.07)}
 .ff-ck-done{width:22px;height:22px;border-radius:99px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;color:#fff;
   background:color-mix(in srgb,var(--good) 80%,#000)}
@@ -1010,7 +1049,8 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
   transition:background .2s var(--ease),border-color .2s var(--ease)}
 .ff-login-soc:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.2)}
-.ff-login-demo{margin-top:14px;text-align:center;font-size:12.5px}
+.ff-login-demo{margin-top:14px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:12.5px}
+.ff-login-demo-sep{color:var(--text-4)}
 .ff-login-foot{margin-top:20px;text-align:center;font-size:12.5px;color:var(--text-3)}
 
 @media (max-width:480px){
@@ -1072,6 +1112,38 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
   color:var(--text-3);transition:color .2s var(--ease)}
 .ff-onb-back:hover,.ff-onb-skip:hover,.ff-onb-skipall:hover{color:var(--text)}
 .ff-onb-skipall{color:var(--text-4)}
+
+/* Willkommens-Video nach dem Onboarding — Vollbild, deckt alles ab */
+.ff-onb--video{padding:0;background:#000}
+.ff-onb-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+
+/* Welcome-Screen nach dem Video — Logo groß, „Willkommen", Button zentriert */
+.ff-welcome{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(24px,4.5vh,46px);padding:48px 24px;text-align:center;
+  background:radial-gradient(1200px 700px at 50% 28%, color-mix(in srgb,var(--accent) 20%,transparent), transparent 62%),
+    radial-gradient(900px 620px at 50% 118%, color-mix(in srgb,var(--accent) 10%,transparent), transparent 60%),
+    #05060a;
+  animation:ffWelcomeIn .7s var(--ease) both}
+@keyframes ffWelcomeIn{from{opacity:0}to{opacity:1}}
+.ff-welcome-logo{width:min(440px,64vw);height:auto;display:block;user-select:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 24px 70px var(--accent-glow)) drop-shadow(0 6px 18px rgba(0,0,0,.5));
+  animation:ffWelcomeLogo 1s var(--ease) both}
+@keyframes ffWelcomeLogo{from{opacity:0;transform:translateY(22px) scale(.92)}to{opacity:1;transform:none}}
+.ff-welcome-title{margin:0;font-family:var(--font-sans);font-weight:800;letter-spacing:-.02em;line-height:1;
+  font-size:clamp(40px,8vw,84px);text-wrap:balance;
+  background:linear-gradient(108deg,#fff 30%,var(--accent-bright) 78%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:ffWelcomeItem .8s var(--ease) .12s both}
+.ff-welcome-go{display:inline-flex;align-items:center;gap:11px;height:66px;padding:0 40px;border:0;border-radius:18px;
+  cursor:pointer;font-family:var(--font-sans);font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--accent-ink);
+  background:var(--accent);box-shadow:0 18px 50px -14px var(--accent-glow),0 5px 16px rgba(0,0,0,.45);
+  transition:background .2s var(--ease),transform .15s var(--ease),opacity .2s;
+  animation:ffWelcomeItem .8s var(--ease) .24s both}
+.ff-welcome-go:hover{background:var(--accent-bright)}
+.ff-welcome-go:active{transform:scale(.97)}
+.ff-welcome-go:disabled{opacity:.55;cursor:default}
+@keyframes ffWelcomeItem{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ff-welcome,.ff-welcome-logo,.ff-welcome-title,.ff-welcome-go{animation:none}}
 
 /* ============================================================
    EMPTY ACCOUNT — onboarding checklist + empty screens
@@ -1475,6 +1547,8 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 /* day timeline */
 .pl-view{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
 .pl-main{min-height:660px;display:flex;flex-direction:column}
+/* Wochenkalender: Höhe folgt dem Inhalt statt an die Sidebar gestreckt zu werden */
+.pl-main--week{min-height:0}
 .pl-main>.panel-pad{flex:1;display:flex;flex-direction:column;min-height:0}
 .pl-tl{position:relative;display:grid;grid-template-columns:54px 1fr;gap:0}
 .pl-tl-axis{position:relative}
