@@ -104,6 +104,14 @@
       setErr(null); setInfo(null);
       if (Auth && Auth.loginTest) { const res = await Auth.loginTest(); finish(res); }
     };
+    const submitOAuth = async (provider) => {
+      if (ok || busy) return;
+      setBusy(true); setErr(null); setInfo(null);
+      const res = await Auth.oauth(provider);
+      // success → the browser navigates to the provider (res.redirecting); on return
+      // the session opens automatically. Only an error lands back here.
+      if (!res.ok) return fail(res);
+    };
 
     const isReg = mode === 'register';
     const isForgot = mode === 'forgot';
@@ -178,8 +186,8 @@
 
         h('div', { className: 'ff-login-or' }, h('span', null, 'oder')),
         h('div', { className: 'ff-login-social' },
-          h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandApple), 'Apple'),
-          h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandGoogle), 'Google')),
+          h('button', { type: 'button', className: 'ff-login-soc', disabled: ok || busy, onClick: () => submitOAuth('apple') }, h(BrandApple), 'Apple'),
+          h('button', { type: 'button', className: 'ff-login-soc', disabled: ok || busy, onClick: () => submitOAuth('google') }, h(BrandGoogle), 'Google')),
         h('div', { className: 'ff-login-demo' },
           h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)'),
           h('span', { className: 'ff-login-demo-sep', 'aria-hidden': true }, '\u00b7'),

@@ -154,6 +154,38 @@
         });
     },
 
+    /* third-party sign-in (Google / Apple) via Supabase OAuth.
+       We build the authorize URL (skipBrowserRedirect) and pre-flight it: the
+       authorize endpoint sends CORS headers, so a 302 (opaqueredirect) means the
+       provider is enabled → we navigate to start the real flow; a 400 means the
+       provider isn't switched on yet → we surface a friendly hint instead of
+       dumping the user on a raw JSON error page. On return to appUrl() the
+       onAuthStateChange handler (detectSessionInUrl) opens the session. */
+    oauth: function (provider) {
+      var n = need(); if (n) return Promise.resolve(n);
+      var label = provider === 'apple' ? 'Apple' : 'Google';
+      var notEnabled = { ok: false, error: label + '-Login ist serverseitig noch nicht aktiviert. Bitte in Supabase → Authentication → Providers den ' + label + '-Provider einschalten.' };
+      return client.auth.signInWithOAuth({ provider: provider, options: { redirectTo: appUrl(), skipBrowserRedirect: true } })
+        .then(function (res) {
+          if (res.error || !res.data || !res.data.url) {
+            return Object.assign({ ok: false }, mapAuthError(res.error || { message: 'OAuth-URL konnte nicht erzeugt werden.' }));
+          }
+          var url = res.data.url;
+          return fetch(url, { method: 'GET', redirect: 'manual' }).then(function (r) {
+            if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+              window.location.assign(url);            // enabled → off to the provider
+              return { ok: true, redirecting: true };
+            }
+            if (r.status === 400 || r.status === 422) return notEnabled;
+            window.location.assign(url);              // unexpected → let the provider screen decide
+            return { ok: true, redirecting: true };
+          }).catch(function () {
+            window.location.assign(url);              // CORS/network hiccup → best-effort redirect
+            return { ok: true, redirecting: true };
+          });
+        });
+    },
+
     register: function (data) {
       data = data || {};
       var name = String(data.name || '').trim();
