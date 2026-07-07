@@ -58,6 +58,9 @@
         FF.zonesSet = true;
         if (Live && Live.setEmptyMode) Live.setEmptyMode(false);
       }
+      // re-inject the account's persisted FIT/CSV imports on top of the base
+      // dataset (apply runs each render; hydrate is safe to call every time).
+      if (window.FFImports && acc && acc.email) window.FFImports.hydrate(acc);
     },
     isEmpty() { return !!FF.empty; },
   };

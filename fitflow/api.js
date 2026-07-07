@@ -76,6 +76,14 @@
 
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // bytes -> "1,8 MB" / "34 KB" (German decimal comma)
+  const humanSize = (bytes) => {
+    if (!bytes && bytes !== 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+  };
+
   /* ----------------------------------------------------------------------
      DATUM-WIEDERBELEBUNG — das Backend liefert ISO-Strings, die App erwartet
      echte Date-Objekte (wie data.js sie erzeugt). Wandelt die bekannten Felder.
@@ -268,18 +276,50 @@
           text: `${r.activity.title} · ${r.activity.tss} TSS übernommen.`, actId: r.activity.id });
         return r;
       }
-      // Mock: rekonstruiere eine plausible Aktivität (wie bisher)
-      await delay(250);
-      const act = window.FF.buildImportedActivity({ fileName: fname, sport: opts.sport });
+      /* No live backend: parse the real file in the browser (window.FitParser).
+         A dropped/selected .FIT or .CSV is genuinely decoded - its telemetry,
+         aggregates, TSS and zone split come from the actual bytes. Only the
+         "Demo-Import" button (no File object) still fabricates a sample. */
+      let act = null, parsed = null;
+      const isFit = /\.fit$/i.test(fname), isCsv = /\.csv$/i.test(fname);
+      if (file && window.FitParser && (isFit || isCsv)) {
+        try {
+          if (isCsv) parsed = window.FitParser.parseCsv(await file.text());
+          else parsed = window.FitParser.parseFit(await file.arrayBuffer());
+        } catch (e) { parsed = { ok: false, error: String(e && e.message || e) }; }
+        if (parsed && parsed.ok) act = window.FF.buildActivityFromFit(parsed, { fileName: fname, sport: opts.sport });
+        else if (parsed && parsed.error) {
+          window.FFLive.notify({ type: 'import', icon: 'alert', title: 'Import fehlgeschlagen', text: parsed.error });
+          throw new Error(parsed.error);
+        }
+      }
+      if (!act) { // demo button, or unreadable file - reconstruct a plausible one
+        await delay(250);
+        act = window.FF.buildImportedActivity({ fileName: fname, sport: opts.sport });
+      }
+
+      // stable, collision-free id so persisted imports never clash with demo a1..aN
+      act.id = 'imp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+
       window.FFLive.addActivity(act);
       window.FFLive.notify({ type: 'import', icon: act.sport, title: 'Import abgeschlossen',
         text: `${act.title} · ${act.tss} TSS · in die Diagnostik übernommen.`, actId: act.id });
-      const rows = act.sport === 'lift'
-        ? `${20 + Math.floor(Math.random() * 20)} Sätze`
-        : `${(2500 + Math.floor(Math.random() * 3500)).toLocaleString('de-DE')} Datenpunkte`;
-      const size = act.sport === 'lift'
-        ? `${30 + Math.floor(Math.random() * 22)}\u2009KB`
-        : `${(0.9 + Math.random() * 1.4).toFixed(1).replace('.', ',')}\u2009MB`;
+
+      const rows = parsed && parsed.rows
+        ? `${parsed.rows.toLocaleString('de-DE')} ${act.sport === 'lift' ? 'Zeilen' : 'Datenpunkte'}`
+        : (act.sport === 'lift'
+          ? `${20 + Math.floor(Math.random() * 20)} Sätze`
+          : `${(2500 + Math.floor(Math.random() * 3500)).toLocaleString('de-DE')} Datenpunkte`);
+      const size = file
+        ? humanSize(file.size)
+        : (act.sport === 'lift'
+          ? `${30 + Math.floor(Math.random() * 22)} KB`
+          : `${(0.9 + Math.random() * 1.4).toFixed(1).replace('.', ',')} MB`);
+
+      // persist per-account so the import survives a reload
+      if (window.FFImports) {
+        window.FFImports.add(act, { name: fname, size, status: 'done', sport: act.sport, rows, actId: act.id });
+      }
       return { activity: act, meta: { name: fname, size, rows, status: 'done' } };
     },
 

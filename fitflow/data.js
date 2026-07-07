@@ -465,6 +465,119 @@
     { name: 'kraft_unterkoerper.csv', size: '34\u2009KB', status: 'done', sport: 'lift', rows: '28 Sätze' },
   ];
 
+  /* Build a real activity from a parsed FIT/CSV summary (window.FitParser).
+     Everything here is derived from the actual file — duration, distance,
+     HR/power/cadence aggregates, TSS, zone split and the telemetry streams
+     are computed, not fabricated. Falls back sensibly when a field is absent. */
+  function buildActivityFromFit(p, opts) {
+    opts = opts || {};
+    const fname = opts.fileName || p.fileName || null;
+
+    // sport: parser guess → filename hint → stream-based inference
+    let sport = p.sport;
+    if (!sport) {
+      const name = (fname || '').toLowerCase();
+      sport = /run|lauf/.test(name) ? 'run'
+        : /kraft|lift|strength|\.csv/.test(name) ? 'lift'
+        : p.avgPower ? 'bike' : (p.avgSpeed || p.distance) ? 'run' : 'lift';
+    }
+
+    const durMin = Math.max(1, Math.round((p.duration || 0) / 60) || 1);
+    const durH = durMin / 60;
+    const distKm = p.distance != null ? +(p.distance / 1000).toFixed(1) : null;
+
+    // intensity factor + TSS: power-based for bike, HR-based otherwise
+    let tss, iF = null;
+    const npOrAvg = p.np || p.avgPower;
+    if (npOrAvg && athlete.ftp) {
+      iF = npOrAvg / athlete.ftp;
+      tss = Math.max(1, Math.round(durH * iF * iF * 100));
+    } else if (p.avgHr && athlete.thrHr) {
+      const hrIf = p.avgHr / athlete.thrHr;
+      tss = Math.max(1, Math.round(durH * hrIf * hrIf * 100));
+    } else {
+      tss = Math.max(1, Math.round(durMin * 0.8));
+    }
+
+    // avg pace (s/km) for running
+    let avgPace = null;
+    const spd = p.avgSpeed || (p.distance && p.duration ? p.distance / p.duration : null);
+    if (sport === 'run' && spd) avgPace = Math.round(1000 / spd);
+
+    // zone minutes: bucket the HR stream against the athlete's zones, else estimate
+    const hrStream = p.records ? p.records.map((r) => r.hr).filter((v) => v != null) : [];
+    let zoneMin;
+    if (hrStream.length > 8 && athlete.thrHr) {
+      const buckets = [0, 0, 0, 0, 0];
+      hrStream.forEach((hr) => {
+        const frac = hr / athlete.thrHr;
+        let zi = hrZones.findIndex((z) => frac < z.hi);
+        if (zi < 0) zi = 4;
+        buckets[zi]++;
+      });
+      const tot = hrStream.length;
+      zoneMin = buckets.map((c) => Math.round((c / tot) * durMin));
+    } else {
+      const w = iF && iF > 0.9 ? [10, 20, 12, 10, 12] : iF && iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
+      zoneMin = zoneDist(durMin, w);
+    }
+
+    // downsample any per-record channel to 60 points for the charts
+    const down = (key) => {
+      const src = p.records ? p.records.map((r) => r[key]) : [];
+      const clean = src.filter((v) => v != null);
+      if (clean.length < 4) return null;
+      const out = [];
+      for (let i = 0; i < 60; i++) {
+        const a = Math.floor((i / 60) * clean.length), b = Math.max(a + 1, Math.floor(((i + 1) / 60) * clean.length));
+        let s = 0, n = 0; for (let k = a; k < b && k < clean.length; k++) { s += clean[k]; n++; }
+        out.push(n ? Math.round(s / n) : clean[Math.min(a, clean.length - 1)]);
+      }
+      return out;
+    };
+    const paceStream = () => {
+      const src = p.records ? p.records.map((r) => (r.speed ? 1000 / r.speed : null)) : [];
+      const clean = src.filter((v) => v != null && isFinite(v) && v < 900);
+      if (clean.length < 4) return null;
+      const out = [];
+      for (let i = 0; i < 60; i++) {
+        const a = Math.floor((i / 60) * clean.length), b = Math.max(a + 1, Math.floor(((i + 1) / 60) * clean.length));
+        let s = 0, n = 0; for (let k = a; k < b && k < clean.length; k++) { s += clean[k]; n++; }
+        out.push(n ? Math.round(s / n) : clean[Math.min(a, clean.length - 1)]);
+      }
+      return out;
+    };
+
+    const streams = {};
+    const hrDown = down('hr'); if (hrDown) streams.hr = hrDown;
+    if (sport === 'run') { const pc = paceStream(); if (pc) streams.pace = pc; }
+    else { const pw = down('power'); if (pw) streams.power = pw; }
+    const cad = down('cadence'); if (cad) streams.cadence = cad;
+
+    const hard = iF != null ? iF > 0.9 : (avgPace && athlete.runThrPace ? avgPace < athlete.runThrPace : false);
+    const intensity = hard ? 'Hard' : (iF != null ? (iF > 0.75 ? 'Tempo' : 'Easy') : 'Tempo');
+    const title = opts.title
+      || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
+        : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
+
+    const date = p.startTime instanceof Date && !isNaN(p.startTime) ? p.startTime : (opts.date || TODAY);
+
+    return mkActivity({
+      sport, title, date, imported: true, fileName: fname,
+      duration: durMin, distance: distKm,
+      elevation: p.elevation != null ? p.elevation : null,
+      calories: p.calories != null ? p.calories : Math.round(durMin * (sport === 'bike' ? 10 : sport === 'run' ? 12 : 6)),
+      tss, rpe: Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))),
+      avgPower: p.avgPower || null, maxPower: p.maxPower || null, np: p.np || null,
+      avgHr: p.avgHr || null, maxHr: p.maxHr || null,
+      avgCad: p.avgCad || null, maxCad: p.maxCad || null, avgPace,
+      intensity, zoneMin,
+      ai: 'Aus deiner echten ' + (fname && /\.csv$/i.test(fname) ? 'CSV' : 'FIT') + '-Datei eingelesen — Dauer, '
+        + 'Distanz, HF/Power/Kadenz, Zonenverteilung und TSS wurden direkt aus den Messwerten berechnet.',
+      streams: Object.keys(streams).length ? streams : undefined,
+    });
+  }
+
   window.FF = {
     fmt, TODAY, addDays,
     athlete, hrZones, powerZones,
@@ -474,7 +587,7 @@
     activities, sportMeta, week,
     annual, months, planner,
     integrations, recentImports,
-    buildImportedActivity, notifications,
+    buildImportedActivity, buildActivityFromFit, notifications,
     zoneColors: ['z1', 'z2', 'z3', 'z4', 'z5'],
   };
 })();

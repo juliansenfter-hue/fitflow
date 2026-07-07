@@ -347,6 +347,7 @@
     const [acct, setAcct] = useState(() => (Auth ? Auth.get() : { email: '', loggedIn: false }));
     const [pane, setPane] = useState(null);   // null | 'email' | 'password' | 'delete'
     const [toast, setToast] = useState(null);
+    const [del, setDel] = useState({ busy: false, err: null });
 
     useEffect(() => { if (!Auth) return; return Auth.subscribe((s) => setAcct(s)); }, []);
     useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 3200); return () => clearTimeout(id); }, [toast]);
@@ -361,6 +362,19 @@
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       flash('Daten als JSON exportiert.');
+    };
+    const doDelete = async () => {
+      if (del.busy) return;
+      setDel({ busy: true, err: null });
+      // capture the account BEFORE deletion so we can wipe its local imports afterwards
+      const acc = Auth.currentAccount && Auth.currentAccount();
+      const res = await Auth.deleteAccount();
+      if (res && res.ok) {
+        if (window.FFImports) { try { window.FFImports.clear(acc); } catch (e) { /* noop */ } }
+        // success: signOut emitted an auth change → Root routes to the login screen
+      } else {
+        setDel({ busy: false, err: (res && res.error) || 'Konto konnte nicht gelöscht werden.' });
+      }
     };
 
     return h(Card, { title: 'Konto', icon: 'profile', tour: 'konto' },
@@ -405,10 +419,11 @@
                 h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
                 h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
               h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
-                'Alle lokal gespeicherten Zugangsdaten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
+                'Dein Konto wird endgültig vom Server (Supabase) gelöscht, alle lokal gespeicherten Daten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
+              del.err && h('p', { style: { fontSize: 12, color: 'var(--bad)', lineHeight: 1.45, margin: '0 0 12px' } }, del.err),
               h('div', { className: 'row gap-8' },
-                h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane(null) }, 'Abbrechen'),
-                h('button', { className: 'btn btn--sm ff-btn-danger', onClick: () => Auth.deleteAccount() }, h(Icon, { name: 'trash', size: 14 }), 'Endgültig löschen')))
+                h('button', { className: 'btn btn--ghost btn--sm', disabled: del.busy, onClick: () => { setDel({ busy: false, err: null }); setPane(null); } }, 'Abbrechen'),
+                h('button', { className: 'btn btn--sm ff-btn-danger', disabled: del.busy, onClick: doDelete }, h(Icon, { name: 'trash', size: 14 }), del.busy ? 'Wird gelöscht …' : 'Endgültig löschen')))
           : h('button', { className: 'ff-acct-danger', onClick: () => setPane('delete') },
               h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'),
 

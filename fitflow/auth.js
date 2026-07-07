@@ -313,15 +313,35 @@
       return client.auth.signOut().then(function () { user = null; emit(); });
     },
 
-    /* best-effort self-delete: needs a `delete_user` RPC in Supabase (optional);
-       falls back to signing out so the account is at least left. */
+    /* Real self-delete via the Supabase `delete_user` RPC (SECURITY DEFINER,
+       deletes auth.uid()). Returns { ok, error }. On success the auth user is
+       gone server-side and we sign the (now-invalid) session out. If the RPC
+       is missing/forbidden we report it instead of faking success, so the
+       account is NOT silently left behind pretending to be deleted. */
     deleteAccount: function () {
-      if (testUser) { testUser = null; emit(); return Promise.resolve(); }
-      if (demo) { demo = false; emit(); return Promise.resolve(); }
-      if (!client) { user = null; emit(); return Promise.resolve(); }
-      return client.rpc('delete_user').catch(function () { /* RPC not set up — ignore */ })
-        .then(function () { return client.auth.signOut(); })
-        .then(function () { user = null; emit(); });
+      // local bypasses (demo / empty-test account): just drop local state
+      if (testUser) { testUser = null; emit(); return Promise.resolve({ ok: true, local: true }); }
+      if (demo) { demo = false; emit(); return Promise.resolve({ ok: true, local: true }); }
+      if (!client) { user = null; emit(); return Promise.resolve({ ok: true, local: true }); }
+
+      function friendly(err) {
+        var m = (err && (err.message || err.msg || err.error_description)) || '';
+        if (/function .*delete_user.* does not exist|could not find the function|schema cache/i.test(m)) {
+          return 'Die Server-Funktion „delete_user" fehlt in Supabase. Bitte das mitgelieferte SQL-Snippet im Supabase SQL-Editor ausführen.';
+        }
+        if (/permission denied|not authorized|jwt/i.test(m)) {
+          return 'Löschen wurde vom Server abgelehnt (fehlende Berechtigung). Bitte die delete_user-Funktion + Grant prüfen.';
+        }
+        return 'Konto konnte nicht gelöscht werden: ' + (m || 'unbekannter Fehler') + '.';
+      }
+
+      return client.rpc('delete_user').then(function (res) {
+        if (res && res.error) return { ok: false, error: friendly(res.error) };
+        return client.auth.signOut().catch(function () { /* session already invalid */ })
+          .then(function () { user = null; recovery = false; emit(); return { ok: true }; });
+      }, function (err) {
+        return { ok: false, error: friendly(err) };
+      });
     },
 
     exportData: function () {
