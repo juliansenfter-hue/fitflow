@@ -157,37 +157,42 @@
     });
   }
 
-  /* miniature live preview of each backdrop mode, recoloured to `color` */
+  /* miniature live preview of each backdrop mode, recoloured to `color`
+     (color 'rainbow' spreads the engine's spectrum + slow hue cycle) */
   function BgPreview({ mode, color }) {
     const B = window.FFBackground;
+    const RB = (B && B.RAINBOW) || ['#ff4d4d', '#ffb13d', '#35d073', '#38b6ff', '#7C5CFF', '#ff4fd8'];
+    const rainbow = color === 'rainbow';
+    const cAt = (i) => (rainbow ? RB[i % RB.length] : color);
+    const anim = rainbow ? { animation: 'ff-hue-cycle 24s linear infinite' } : null;
     if (mode === 'etheral') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('div', { style: { position: 'absolute', inset: '-22%', filter: 'blur(7px)',
           background:
-            `radial-gradient(44% 54% at 30% 32%, ${bgRgba(color, 0.95)} 0%, transparent 66%),` +
-            `radial-gradient(50% 60% at 72% 66%, ${bgRgba(color, 0.7)} 0%, transparent 70%),` +
-            `radial-gradient(54% 58% at 58% 14%, ${bgRgba(color, 0.5)} 0%, transparent 74%)` } }));
+            `radial-gradient(44% 54% at 30% 32%, ${bgRgba(cAt(0), 0.95)} 0%, transparent 66%),` +
+            `radial-gradient(50% 60% at 72% 66%, ${bgRgba(cAt(1), 0.7)} 0%, transparent 70%),` +
+            `radial-gradient(54% 58% at 58% 14%, ${bgRgba(cAt(2), 0.5)} 0%, transparent 74%)` } }));
     }
     if (mode === 'beams') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('div', { style: { position: 'absolute', inset: 0,
           backgroundImage:
-            `linear-gradient(118deg, transparent 26%, ${bgRgba(color, 0.62)} 40%, transparent 50%),` +
-            `linear-gradient(118deg, transparent 50%, ${bgRgba(color, 0.46)} 62%, transparent 72%),` +
-            `linear-gradient(118deg, transparent 6%, ${bgRgba(color, 0.34)} 16%, transparent 24%)` } }));
+            `linear-gradient(118deg, transparent 26%, ${bgRgba(cAt(0), 0.62)} 40%, transparent 50%),` +
+            `linear-gradient(118deg, transparent 50%, ${bgRgba(cAt(1), 0.46)} 62%, transparent 72%),` +
+            `linear-gradient(118deg, transparent 6%, ${bgRgba(cAt(2), 0.34)} 16%, transparent 24%)` } }));
     }
     if (mode === 'bars') {
       const hs = [1, 0.78, 0.55, 0.4, 0.3, 0.4, 0.55, 0.78, 1];
-      return h('div', { className: 'ff-bgprev', style: { display: 'flex', alignItems: 'flex-end', gap: 2, padding: '0 5px' } },
+      return h('div', { className: 'ff-bgprev', style: Object.assign({ display: 'flex', alignItems: 'flex-end', gap: 2, padding: '0 5px' }, anim) },
         hs.map((hh, i) => h('div', { key: i, style: { flex: 1, height: (hh * 100) + '%', borderRadius: '2px 2px 0 0',
-          background: `linear-gradient(to top, ${bgRgba(color, 0.95)}, ${bgRgba(color, 0)})` } })));
+          background: `linear-gradient(to top, ${bgRgba(cAt(i), 0.95)}, ${bgRgba(cAt(i), 0)})` } })));
     }
     if (mode === 'paths') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('svg', { viewBox: '0 0 100 64', preserveAspectRatio: 'none', style: { position: 'absolute', inset: 0, width: '100%', height: '100%' } },
           [0, 1, 2, 3, 4, 5].map((i) => h('path', { key: i,
             d: `M-8 ${64 - i * 8} C 22 ${48 - i * 7}, 48 ${10 + i * 5}, 108 ${30 - i * 9}`,
-            fill: 'none', stroke: color, strokeWidth: 0.8 + i * 0.12, strokeOpacity: 0.28 + i * 0.11 }))));
+            fill: 'none', stroke: cAt(i), strokeWidth: 0.8 + i * 0.12, strokeOpacity: 0.28 + i * 0.11 }))));
     }
     // photo — reflects a custom uploaded image when present
     const url = (B && B.get().photo) || (B && B.PHOTO_URL);
@@ -196,21 +201,28 @@
 
   function BgTile({ mode, label, active, color, onSelect }) {
     return h('button', { className: 'ff-bgtile' + (active ? ' is-active' : ''), onClick: onSelect, type: 'button' },
-      h(BgPreview, { mode, color }),
-      active && h('span', { className: 'ff-bgtile-check' }, h(Icon, { name: 'check', size: 12 })),
+      h('span', { className: 'ff-bgtile-shot' },
+        h(BgPreview, { mode, color }),
+        h('span', { className: 'ff-bgprev-ui', 'aria-hidden': true })),
       h('span', { className: 'ff-bgtile-label' }, label));
   }
 
   function ColorSwatches({ value, options, onChange }) {
     const lc = String(value).toLowerCase();
-    const preset = options.some((c) => c.toLowerCase() === lc);
+    const all = options.concat(['rainbow']);   // Spektrum als kuratierte Option
+    const preset = all.some((c) => c.toLowerCase() === lc);
+    const hex = /^#/.test(String(value)) ? value : '#7C5CFF';   // <input type=color> braucht Hex
     return h('div', { className: 'ff-swatches' },
-      options.map((c) => h('button', { key: c, type: 'button',
-        className: 'ff-swatch' + (c.toLowerCase() === lc ? ' is-active' : ''),
-        style: { '--sw': c }, onClick: () => onChange(c), title: c })),
-      h('label', { className: 'ff-swatch ff-swatch--custom' + (!preset ? ' is-active' : ''), style: { '--sw': value }, title: 'Eigene Farbe' },
+      all.map((c) => {
+        const rb = c === 'rainbow';
+        return h('button', { key: c, type: 'button',
+          className: 'ff-swatch' + (rb ? ' ff-swatch--rainbow' : '') + (c.toLowerCase() === lc ? ' is-active' : ''),
+          style: rb ? undefined : { '--sw': c }, onClick: () => onChange(c),
+          title: rb ? 'Regenbogen' : c, 'aria-label': rb ? 'Regenbogen-Spektrum' : c });
+      }),
+      h('label', { className: 'ff-swatch ff-swatch--custom' + (!preset ? ' is-active' : ''), style: { '--sw': hex }, title: 'Eigene Farbe' },
         h(Icon, { name: 'plus', size: 13, style: { color: '#fff', position: 'relative', zIndex: 1, mixBlendMode: 'difference' } }),
-        h('input', { type: 'color', value, onChange: (e) => onChange(e.target.value) })));
+        h('input', { type: 'color', value: hex, onChange: (e) => onChange(e.target.value) })));
   }
 
   function PhotoImport({ photo, onFile, onReset }) {
@@ -257,42 +269,40 @@
     const COLORS = ((B && B.PRESETS) || []).map((p) => p.color);
 
     return h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }, 'data-prof': true },
-      /* ---- Hintergrund (full width) ---- */
+      /* ---- Hintergrund (volle Breite) ---- */
       B && b && h('div', { style: { gridColumn: '1 / -1' } },
         h(Card, { title: 'Hintergrund', icon: 'image', info: 'Wähle eine Szene und Farbe — live hinter allen Glas-Kästchen in jedem Reiter.' },
-          h('div', { className: 'ff-bgtiles' },
-            MODES.map((m) => h(BgTile, { key: m.id, mode: m.id, label: m.label, active: b.mode === m.id, color: b.color, onSelect: () => setBg('mode')(m.id) }))),
-          b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
-          b.mode === 'photo' && h('div', { className: 'ff-bg-sliders', style: { marginTop: 16 } },
-            h(GSlider, { label: 'Größe', value: Math.round(b.photoScale * 100), min: 100, max: 300, format: (v) => v + '%', hint: 'Foto vergrößern – zoomt in den Bildausschnitt', onChange: (v) => setBg('photoScale')(v / 100) }),
-            h(GSlider, { label: 'Ausschnitt horizontal', value: b.photoX, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach links / rechts schieben', onChange: setBg('photoX') }),
-            h(GSlider, { label: 'Ausschnitt vertikal', value: b.photoY, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach oben / unten schieben', onChange: setBg('photoY') })),
-          h('div', { className: 'ff-bg-controls' + (b.mode === 'photo' ? ' ff-bg-controls--solo' : '') },
-            b.mode !== 'photo' && h('div', { className: 'col gap-10' },
-              h('span', { className: 'label', style: { display: 'flex', alignItems: 'center', gap: 7 } }, h(Icon, { name: 'palette', size: 14, style: { color: 'var(--text-3)' } }), 'Farbe'),
-              h(ColorSwatches, { value: b.color, options: COLORS, onChange: setBg('color') })),
-            h('div', { className: 'ff-bg-sliders' },
-              h(GSlider, { label: 'Stärke', value: b.intensity, min: 30, max: 100, format: (v) => v + '%', hint: 'Gesamtintensität des Hintergrunds', onChange: setBg('intensity') }),
-              b.mode === 'bars' && h(GSlider, { label: 'Balkenanzahl', value: b.bars, min: 5, max: 28, format: (v) => v, hint: 'Anzahl der animierten Balken', onChange: setBg('bars') }))))),
+        h('div', { className: 'ff-bgtiles' },
+          MODES.map((m) => h(BgTile, { key: m.id, mode: m.id, label: m.label, active: b.mode === m.id, color: b.color, onSelect: () => setBg('mode')(m.id) }))),
+        b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
+        h('div', { className: 'ff-bg-controls' },
+          b.mode !== 'photo' && h('div', { className: 'ff-bg-colorrow' },
+            h('span', { className: 'ff-gs-label' }, 'Farbe'),
+            h(ColorSwatches, { value: b.color, options: COLORS, onChange: setBg('color') })),
+          h('div', { className: 'ff-gs-stack' },
+            h(GSlider, { label: 'Stärke', value: b.intensity, min: 30, max: 100, format: (v) => v + '%', onChange: setBg('intensity') }),
+            b.mode === 'bars' && h(GSlider, { key: 'bars', label: 'Balkenanzahl', value: b.bars, min: 5, max: 28, format: (v) => v, onChange: setBg('bars') }),
+            b.mode === 'photo' && h(GSlider, { key: 'ps', label: 'Größe', value: Math.round(b.photoScale * 100), min: 100, max: 300, format: (v) => v + '%', onChange: (v) => setBg('photoScale')(v / 100) }),
+            b.mode === 'photo' && h(GSlider, { key: 'px', label: 'Ausschnitt horizontal', value: b.photoX, min: 0, max: 100, format: (v) => v + '%', onChange: setBg('photoX') }),
+            b.mode === 'photo' && h(GSlider, { key: 'py', label: 'Ausschnitt vertikal', value: b.photoY, min: 0, max: 100, format: (v) => v + '%', onChange: setBg('photoY') }))))),
 
       /* ---- Material ---- */
-      h('div', { className: 'col gap-18' },
-        h(Card, { title: 'Material', icon: 'layers', info: 'Tönung und Unschärfe des Glases — live auf alle Kästchen angewendet.' },
-          h('div', { className: 'ff-gs-stack' },
-            h(GSlider, { label: 'Deckkraft', value: s.opacity, min: 0, max: 55, format: (v) => v + '%', hint: 'Einfärbung / Transparenz der Kästchen', onChange: upd('opacity') }),
-            h(GSlider, { label: 'Unschärfe', value: s.blur, min: 0, max: 30, format: (v) => v + 'px', hint: 'Intensität der Hintergrund-Unschärfe', onChange: upd('blur') }),
-            h(GSlider, { label: 'Sättigung', value: s.sat, min: 100, max: 220, format: (v) => v + '%', hint: 'Farbsättigung des Hintergrunds', onChange: upd('sat') }),
-            h(GSlider, { label: 'Helligkeit', value: s.bright, min: 80, max: 140, format: (v) => v + '%', hint: 'Lichtdurchlässigkeit des Materials', onChange: upd('bright') })))),
+      h(Card, { title: 'Material', icon: 'layers', info: 'Tönung und Unschärfe des Glases — live auf alle Kästchen angewendet.' },
+        h('div', { className: 'ff-gs-stack' },
+          h(GSlider, { label: 'Deckkraft', value: s.opacity, min: 0, max: 55, format: (v) => v + '%', onChange: upd('opacity') }),
+          h(GSlider, { label: 'Unschärfe', value: s.blur, min: 0, max: 30, format: (v) => v + 'px', onChange: upd('blur') }),
+          h(GSlider, { label: 'Sättigung', value: s.sat, min: 100, max: 220, format: (v) => v + '%', onChange: upd('sat') }),
+          h(GSlider, { label: 'Helligkeit', value: s.bright, min: 80, max: 140, format: (v) => v + '%', onChange: upd('bright') }))),
 
       /* ---- Form ---- */
-      h('div', { className: 'col gap-18' },
-        h(Card, { title: 'Form', icon: 'spark', info: 'Geometrie und Tönung der Glas-Kästchen.' },
-          h('div', { className: 'ff-gs-stack' },
-            h(GSlider, { label: 'Eckenradius', value: s.radius, min: 0, max: 44, format: (v) => v + 'px', hint: 'Rundung der Glas-Ecken', onChange: upd('radius') }),
-            h(GToggle, { label: 'Heller Hintergrund', value: s.overLight, hint: 'Glas dunkler tönen (für helle Hintergründe)', onChange: upd('overLight') })),
-          h('div', { className: 'row', style: { marginTop: 22 } },
-            h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => { G.reset(); B && B.reset(); } }, h(Icon, { name: 'refresh', size: 15 }), 'Auf Standard zurücksetzen'))),
-        h(AiInsight, { title: 'Hinweis' }, 'Hintergrund und Glas werden live auf alle Kästchen angewendet – auch auf diese Karten. Einstellungen bleiben gespeichert.')));
+      h(Card, { title: 'Form', icon: 'spark', info: 'Geometrie und Tönung der Glas-Kästchen.' },
+        h('div', { className: 'ff-gs-stack' },
+          h(GSlider, { label: 'Eckenradius', value: s.radius, min: 0, max: 44, format: (v) => v + 'px', onChange: upd('radius') }),
+          h(GToggle, { label: 'Heller Hintergrund', value: s.overLight, hint: 'Glas dunkler tönen, z. B. für helle Fotos', onChange: upd('overLight') })),
+        h('div', { className: 'row', style: { marginTop: 20 } },
+          h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => { G.reset(); B && B.reset(); } }, h(Icon, { name: 'refresh', size: 15 }), 'Auf Standard zurücksetzen'))),
+
+      h('p', { className: 'ff-ds-foot', style: { gridColumn: '1 / -1' } }, 'Änderungen wirken sofort auf die gesamte Oberfläche und bleiben gespeichert.'));
   }
   function GSlider({ label, hint, value, min, max, step = 1, format, onChange }) {
     const trackRef = useRef(null);
@@ -329,10 +339,11 @@
 
   function GToggle({ label, hint, value, onChange }) {
     return h('button', { className: 'row between center', onClick: () => onChange(!value),
-      style: { width: '100%', padding: '18px 0 4px', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left' } },
-      h('div', { className: 'col gap-4' },
+      style: { width: '100%', padding: '14px 0 4px', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', gap: 16 },
+      role: 'switch', 'aria-checked': !!value },
+      h('div', { className: 'col gap-3', style: { minWidth: 0 } },
         h('span', { className: 'ff-gs-label' }, label),
-        hint && h('span', { className: 'ff-gs-hint', style: { marginTop: 0 } }, hint)),
+        hint && h('span', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.4 } }, hint)),
       h('span', { className: 'ff-gtoggle' + (value ? ' is-on' : '') },
         h('span', { className: 'ff-gtoggle-knob' })));
   }
