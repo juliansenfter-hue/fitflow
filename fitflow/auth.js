@@ -309,6 +309,11 @@
       try { return !!localStorage.getItem(dashOpenKey(acc)); } catch (e) { return false; }
     },
 
+    /* force Root to re-render and re-evaluate empty↔full — used after a background
+       data change (e.g. a Strava sync that just pulled in the first activities),
+       so the real dashboard opens automatically instead of staying on the checklist. */
+    refresh: function () { emit(); },
+
     /* lokaler Test: frisches, leeres Konto simulieren → Onboarding + Video + leeres Dashboard,
        ganz ohne echte E-Mail / Supabase. */
     loginTest: function () {

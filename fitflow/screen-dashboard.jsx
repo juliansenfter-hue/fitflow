@@ -643,7 +643,13 @@
     const Live = window.FFLive;
     const profileDone = !!(a.age && a.height && a.weight);
     const serviceDone = !!(Live && Live.integrations && Live.integrations.some((i) => i.status === 'connected'));
-    const activitiesDone = !!(FF.activities && FF.activities.length > 0);
+    // "Aktivitäten importieren" is done as soon as ANY activities exist — whether
+    // from a manual FIT/CSV upload OR pulled in by a connected service (Strava).
+    // Read the persisted import count directly so a background sync counts even
+    // before the in-memory list has been re-hydrated.
+    const acc = (window.FFAuth && FFAuth.currentAccount) ? FFAuth.currentAccount() : null;
+    const importCount = (window.FFImports && acc) ? FFImports.count(acc) : 0;
+    const activitiesDone = importCount > 0 || !!(FF.activities && FF.activities.length > 0);
     const steps = [
       { key: 'profil', icon: 'profile', t: 'Profil vervollständigen', d: 'Alter, Größe, Gewicht & Schwellenwerte hinterlegen', done: profileDone, go: 'profil', cta: 'Profil öffnen' },
       { key: 'dienst', icon: 'link', t: 'Dienst verbinden', d: 'Strava, Garmin, Wahoo oder Apple Health', done: serviceDone, go: 'import', cta: 'Verbinden' },

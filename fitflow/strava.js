@@ -139,6 +139,9 @@
       reflectStatus(acc);
       if (added > 0) notify('activity', 'Strava synchronisiert', added + (added === 1 ? ' neue Aktivität übernommen.' : ' neue Aktivitäten übernommen.'));
       if (window.FFLive && FFLive.touch) FFLive.touch();       // trigger a re-render → metrics recompute
+      // first activities just arrived → let Root re-evaluate empty↔full so the
+      // real dashboard opens automatically (no manual FIT upload / step 3 needed).
+      if (added > 0 && window.FFAuth && FFAuth.refresh) FFAuth.refresh();
       return { ok: true, connected: true, added };
     },
 

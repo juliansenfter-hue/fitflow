@@ -180,29 +180,28 @@ async function callback(url: URL): Promise<Response> {
   return redirect(ret, { strava: "connected" });
 }
 
+// Only the 40 MOST RECENT activities per athlete. Strava returns the list
+// newest-first by default (no `after`/`before` filter), so page 1 with
+// per_page=40 is exactly the latest 40. The client de-dupes by id, so repeat
+// syncs pick up newly added activities without ever pulling the old backlog.
+const SYNC_LIMIT = 40;
+
 async function sync(req: Request): Promise<Response> {
   const user = await userFromReq(req);
   if (!user) return json({ error: "unauthorized" }, 401);
   const t = await getToken(user.id);
   if (!t) return json({ connected: false });
 
-  const body = await req.json().catch(() => ({}));
-  const after = Number(body.after) || t.last_sync || 0;
-
-  let all: any[] = [];
-  for (let page = 1; page <= 4; page++) {
-    const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&per_page=100&page=${page}`, {
-      headers: { Authorization: `Bearer ${t.access_token}` },
-    });
-    if (!res.ok) {
-      if (res.status === 401) return json({ connected: false, error: "token" });
-      break;
-    }
-    const arr = await res.json();
-    if (!Array.isArray(arr) || arr.length === 0) break;
-    all = all.concat(arr);
-    if (arr.length < 100) break;
+  const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?per_page=${SYNC_LIMIT}&page=1`, {
+    headers: { Authorization: `Bearer ${t.access_token}` },
+  });
+  if (!res.ok) {
+    if (res.status === 401) return json({ connected: false, error: "token" });
+    return json({ connected: true, athlete: t.athlete_name, athleteId: t.athlete_id, activities: [] });
   }
+  let all = await res.json();
+  if (!Array.isArray(all)) all = [];
+  all = all.slice(0, SYNC_LIMIT); // newest 40 only
 
   await admin.from("strava_tokens").update({ last_sync: Math.floor(Date.now() / 1000), updated_at: new Date().toISOString() }).eq("user_id", user.id);
   return json({ connected: true, athlete: t.athlete_name, athleteId: t.athlete_id, activities: all.map(mapActivity) });
