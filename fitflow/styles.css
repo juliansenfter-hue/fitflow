@@ -994,6 +994,13 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
    KONTO — inline editors, rows, toast, confirm, danger
    ============================================================ */
 .ff-acct-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+/* einheitliche Einstellungs-Zeile (Konto- & Einstellungen-Kästchen):
+   Label/Wert links, ein Bedienelement rechts, Haarlinie darüber */
+.ff-setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 0;border:0;border-top:1px solid var(--line-soft)}
+.ff-setrow:first-child{border-top:0;padding-top:2px}
+.ff-setrow--stack{display:block}
+button.ff-setrow{width:100%;background:none;cursor:pointer;text-align:left;font-family:inherit}
 .ff-acct-edit{padding:14px;border-radius:var(--r-md,12px);background:var(--panel-2);border:1px solid var(--line)}
 .ff-acct-toast{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;color:var(--good);
   padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--good) 13%,transparent);
@@ -1493,6 +1500,8 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 @media (max-width:1000px){
   .ff-content > .ff-grid[data-imp]{grid-template-columns:1fr !important}
   .ff-content > .ff-grid[data-prof]{grid-template-columns:1fr !important}
+  /* Profil-Seite: 2-spaltige Karten-Reihen (Profil+Konto, Zonen) stapeln */
+  .ff-content [data-prof] > .ff-grid{grid-template-columns:1fr !important}
 }
 
 /* ============================================================

@@ -57,7 +57,7 @@
       /* row 1: Athletenprofil + Konto */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: '1fr 1fr', gap: 18, alignItems: 'stretch' } },
         h(Card, { title: 'Athletenprofil', icon: 'profile' },
-          h('div', { className: 'row center gap-16', style: { marginBottom: 20 } },
+          h('div', { className: 'row center gap-16', style: { paddingBottom: 18, marginBottom: 16, borderBottom: '1px solid var(--line-soft)' } },
             h('div', { style: { position: 'relative' } },
               avatar
                 ? h('img', { src: avatar, style: { width: 72, height: 72, borderRadius: 16, objectFit: 'cover', border: '1px solid var(--line-2)' } })
@@ -66,8 +66,7 @@
               h('input', { ref: fileRef, type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: onAvatar })),
             h('div', { className: 'col gap-3' },
               h('span', { className: 'h3', style: { fontSize: 18 } }, p.name),
-              h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, a.role),
-              h('span', { className: 'chip chip--solid', style: { marginTop: 4, alignSelf: 'flex-start' } }, h(Icon, { name: 'spark', size: 12 }), `FitFlow ${a.plan}`))),
+              h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, a.role))),
           h('div', { className: 'col gap-12' },
             h(Field, { label: 'Profilname' }, h('input', { className: 'ff-input', value: p.name, onChange: (e) => setP({ ...p, name: e.target.value }) })),
             h('div', { className: 'ff-grid grid-3', style: { gap: 12 } },
@@ -103,7 +102,7 @@
 
       /* row 4: Leistungskennzahlen über die gesamte Breite */
       h(Card, { title: 'Leistungskennzahlen', icon: 'gauge' },
-        h('div', { className: 'ff-grid', style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 } },
+        h('div', { className: 'ff-grid grid-4', style: { gap: 16 } },
           h(KStat, { label: 'BMI', value: bmi }),
           h(KStat, { label: 'VO₂max', value: empty ? '—' : fmt.n(a.vo2max, 1), unit: 'ml/min/kg', color: 'good' }),
           h(KStat, { label: 'FTP / kg', value: wkg, unit: 'W/kg', color: 'sport-bike' }),
@@ -402,59 +401,64 @@
       }
     };
 
+    // einheitliche Zeile: Label + Wert links, genau ein Bedienelement rechts
+    const AcctRow = (label, value, action, valueStyle) =>
+      h('div', { className: 'ff-setrow' },
+        h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+          h('span', { className: 'label' }, label),
+          h('span', { className: 'strong', style: Object.assign({ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, valueStyle) }, value)),
+        action);
+
     return h(Card, { title: 'Konto', icon: 'profile', tour: 'konto' },
-      h('div', { className: 'col gap-14' },
-        h('div', { className: 'row between center', style: { padding: '2px 0' } },
-          h('div', { className: 'row center gap-10' },
-            h('span', { className: 'ff-acct-dot is-on' }),
-            h('div', { className: 'col gap-1' },
-              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, 'Angemeldet'),
-              h('span', { style: { fontSize: 11.5, color: 'var(--text-3)' } }, acct.email))),
+      h('div', { className: 'col', style: { height: '100%' } },
+        toast && h('div', { className: 'ff-acct-toast', style: { marginBottom: 12 } }, h(Icon, { name: 'check', size: 14 }), h('span', null, toast)),
+
+        // ---- status
+        h('div', { className: 'ff-setrow' },
+          h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+            h('span', { className: 'label' }, 'Status'),
+            h('div', { className: 'row center gap-8' },
+              h('span', { className: 'ff-acct-dot is-on' }),
+              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, 'Angemeldet'))),
           h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'spark', size: 12 }), `FitFlow ${a.plan}`)),
-
-        toast && h('div', { className: 'ff-acct-toast' }, h(Icon, { name: 'check', size: 14 }), h('span', null, toast)),
-
-        h('div', { className: 'rule' }),
 
         // ---- e-mail row / inline editor
         pane === 'email'
-          ? h(EmailEditor, { current: acct.email, onCancel: () => setPane(null), onSaved: (msg) => { setPane(null); flash(msg); } })
-          : h('div', { className: 'ff-acct-row' },
-              h('div', { className: 'col gap-1', style: { minWidth: 0 } },
-                h('span', { className: 'label' }, 'E-Mail-Adresse'),
-                h('span', { className: 'strong', style: { fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, acct.email)),
+          ? h('div', { className: 'ff-setrow ff-setrow--stack' },
+              h(EmailEditor, { current: acct.email, onCancel: () => setPane(null), onSaved: (msg) => { setPane(null); flash(msg); } }))
+          : AcctRow('E-Mail-Adresse', acct.email,
               h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane('email') }, h(Icon, { name: 'mailOpen', size: 14 }), 'Ändern')),
 
         // ---- password row / inline editor
         pane === 'password'
-          ? h(PasswordEditor, { onCancel: () => setPane(null), onSaved: () => { setPane(null); flash('Passwort aktualisiert.'); } })
-          : h('div', { className: 'ff-acct-row' },
-              h('div', { className: 'col gap-1' },
-                h('span', { className: 'label' }, 'Passwort'),
-                h('span', { className: 'strong', style: { fontSize: 13.5, letterSpacing: '.12em' } }, '••••••••')),
-              h('button', { className: 'btn btn--outline btn--sm', onClick: () => setPane('password') }, h(Icon, { name: 'lock', size: 14 }), 'Ändern')),
+          ? h('div', { className: 'ff-setrow ff-setrow--stack' },
+              h(PasswordEditor, { onCancel: () => setPane(null), onSaved: () => { setPane(null); flash('Passwort aktualisiert.'); } }))
+          : AcctRow('Passwort', '••••••••',
+              h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane('password') }, h(Icon, { name: 'lock', size: 14 }), 'Ändern'),
+              { letterSpacing: '.12em' }),
 
-        h('button', { className: 'btn btn--ghost btn--sm', style: { alignSelf: 'flex-start' }, onClick: onExport },
-          h(Icon, { name: 'download', size: 14 }), 'Daten exportieren'),
+        // ---- data export as a row like all others
+        AcctRow('Datenexport', 'Alle Daten als JSON-Datei',
+          h('button', { className: 'btn btn--ghost btn--sm', onClick: onExport }, h(Icon, { name: 'download', size: 14 }), 'Exportieren'),
+          { fontWeight: 500, color: 'var(--text-3)' }),
 
-        // ---- delete (with confirmation)
-        pane === 'delete'
-          ? h('div', { className: 'ff-acct-confirm' },
-              h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
-                h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
-                h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
-              h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
-                'Dein Konto wird endgültig vom Server (Supabase) gelöscht, alle lokal gespeicherten Daten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
-              del.err && h('p', { style: { fontSize: 12, color: 'var(--bad)', lineHeight: 1.45, margin: '0 0 12px' } }, del.err),
-              h('div', { className: 'row gap-8' },
-                h('button', { className: 'btn btn--ghost btn--sm', disabled: del.busy, onClick: () => { setDel({ busy: false, err: null }); setPane(null); } }, 'Abbrechen'),
-                h('button', { className: 'btn btn--sm ff-btn-danger', disabled: del.busy, onClick: doDelete }, h(Icon, { name: 'trash', size: 14 }), del.busy ? 'Wird gelöscht …' : 'Endgültig löschen')))
-          : h('button', { className: 'ff-acct-danger', onClick: () => setPane('delete') },
-              h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'),
-
-        h('div', { className: 'rule' }),
-        h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
-          h(Icon, { name: 'logout', size: 16 }), 'Abmelden')));
+        // ---- footer: sign out, then the danger zone tucked underneath
+        h('div', { className: 'col gap-12', style: { marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line-soft)' } },
+          h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
+            h(Icon, { name: 'logout', size: 16 }), 'Abmelden'),
+          pane === 'delete'
+            ? h('div', { className: 'ff-acct-confirm' },
+                h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
+                  h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
+                  h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
+                h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
+                  'Dein Konto wird endgültig vom Server (Supabase) gelöscht, alle lokal gespeicherten Daten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
+                del.err && h('p', { style: { fontSize: 12, color: 'var(--bad)', lineHeight: 1.45, margin: '0 0 12px' } }, del.err),
+                h('div', { className: 'row gap-8' },
+                  h('button', { className: 'btn btn--ghost btn--sm', disabled: del.busy, onClick: () => { setDel({ busy: false, err: null }); setPane(null); } }, 'Abbrechen'),
+                  h('button', { className: 'btn btn--sm ff-btn-danger', disabled: del.busy, onClick: doDelete }, h(Icon, { name: 'trash', size: 14 }), del.busy ? 'Wird gelöscht …' : 'Endgültig löschen')))
+            : h('button', { className: 'ff-acct-danger', style: { alignSelf: 'center' }, onClick: () => setPane('delete') },
+                h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'))));
   }
 
   /* inline e-mail editor */
@@ -513,7 +517,7 @@
      EINSTELLUNGEN — Einheiten, Sprache, Zeit, Benachrichtigungen
      ============================================================ */
   function SetRow({ label, hint, children }) {
-    return h('div', { className: 'row between center', style: { gap: 14, padding: '11px 0', borderTop: '1px solid var(--line-soft)' } },
+    return h('div', { className: 'ff-setrow' },
       h('div', { className: 'col gap-1', style: { minWidth: 0 } },
         h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
         hint && h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, hint)),
@@ -524,8 +528,7 @@
       h('button', { key: v, className: 'ff-pill' + (value === v ? ' is-active' : ''), style: { height: 32, fontSize: 12, padding: '0 12px' }, onClick: () => onChange(v) }, l)));
   }
   function NotiRow({ label, value, onChange }) {
-    return h('button', { className: 'row between center', onClick: () => onChange(!value),
-      style: { width: '100%', padding: '11px 0', borderTop: '1px solid var(--line-soft)', background: 'none', border: 0, borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: 'var(--line-soft)', cursor: 'pointer', textAlign: 'left' } },
+    return h('button', { className: 'ff-setrow', onClick: () => onChange(!value) },
       h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
       h('span', { className: 'ff-gtoggle' + (value ? ' is-on' : '') }, h('span', { className: 'ff-gtoggle-knob' })));
   }
@@ -540,16 +543,19 @@
         ? [['de', 'Deutsch'], ['en', 'English'], ['it', 'Italiano']].map(([k, l]) => h('option', { key: k, value: k }, l))
         : [['Europe/Vienna', 'Wien (MEZ)'], ['Europe/Berlin', 'Berlin (MEZ)'], ['Europe/Rome', 'Rom (MEZ)'], ['Europe/London', 'London (GMT)']].map(([k, l]) => h('option', { key: k, value: k }, l)));
     return h(Card, { title: 'Einstellungen', icon: 'settings' },
-      h('div', { className: 'col' },
-        h(SetRow, { label: 'Einheiten', hint: 'Distanz, Gewicht & Tempo', children: h(Seg, { value: units, options: [['metric', 'Metrisch'], ['imperial', 'Imperial']], onChange: setUnits }) }),
-        h(SetRow, { label: 'Sprache', children: sel(lang, setLang) }),
-        h(SetRow, { label: 'Zeitzone', children: sel(tz, setTz) }),
-        h(SetRow, { label: 'Wochenstart', children: h(Seg, { value: week, options: [['mo', 'Mo'], ['su', 'So']], onChange: setWeek }) }),
-        h('div', { className: 'label', style: { padding: '16px 0 2px' } }, 'Benachrichtigungen'),
-        h(NotiRow, { label: 'Trainingserinnerungen', value: noti.reminder, onChange: (v) => setNoti({ ...noti, reminder: v }) }),
-        h(NotiRow, { label: 'Wochenrückblick per E-Mail', value: noti.weekly, onChange: (v) => setNoti({ ...noti, weekly: v }) }),
-        h(NotiRow, { label: 'Sync- & Import-Hinweise', value: noti.sync, onChange: (v) => setNoti({ ...noti, sync: v }) }),
-        h(NotiRow, { label: 'Push auf Mobilgerät', value: noti.push, onChange: (v) => setNoti({ ...noti, push: v }) })));
+      h('div', { className: 'ff-grid grid-2', style: { gap: '4px 44px', alignItems: 'start' } },
+        h('div', { className: 'col' },
+          h('div', { className: 'label', style: { padding: '2px 0 4px' } }, 'Allgemein'),
+          h(SetRow, { label: 'Einheiten', hint: 'Distanz, Gewicht & Tempo', children: h(Seg, { value: units, options: [['metric', 'Metrisch'], ['imperial', 'Imperial']], onChange: setUnits }) }),
+          h(SetRow, { label: 'Sprache', children: sel(lang, setLang) }),
+          h(SetRow, { label: 'Zeitzone', children: sel(tz, setTz) }),
+          h(SetRow, { label: 'Wochenstart', children: h(Seg, { value: week, options: [['mo', 'Mo'], ['su', 'So']], onChange: setWeek }) })),
+        h('div', { className: 'col' },
+          h('div', { className: 'label', style: { padding: '2px 0 4px' } }, 'Benachrichtigungen'),
+          h(NotiRow, { label: 'Trainingserinnerungen', value: noti.reminder, onChange: (v) => setNoti({ ...noti, reminder: v }) }),
+          h(NotiRow, { label: 'Wochenrückblick per E-Mail', value: noti.weekly, onChange: (v) => setNoti({ ...noti, weekly: v }) }),
+          h(NotiRow, { label: 'Sync- & Import-Hinweise', value: noti.sync, onChange: (v) => setNoti({ ...noti, sync: v }) }),
+          h(NotiRow, { label: 'Push auf Mobilgerät', value: noti.push, onChange: (v) => setNoti({ ...noti, push: v }) }))));
   }
 
   /* ============================================================

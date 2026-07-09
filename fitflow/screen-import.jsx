@@ -10,21 +10,21 @@
     garmin: { c: '#0a9bdc', glyph: 'G' }, wahoo: { c: '#1f8efa', glyph: 'W' },
   };
 
+  /* eine Integration = eine ruhige Zeile (wie Konto/Einstellungen im Profil):
+     Marken-Glyphe + Name + eine Statuszeile links, genau ein Button rechts */
   function Integration({ it, onToggle, busy }) {
     const b = BRAND[it.id];
     const connected = it.status === 'connected';
-    return h('div', { style: {
-      display: 'flex', alignItems: 'center', gap: 14, padding: '16px',
-      background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 12,
-    } },
-      h('div', { style: { width: 42, height: 42, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${b.c} 18%, transparent)`, color: b.c, fontWeight: 800, fontSize: 19 } }, b.glyph),
-      h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
-        h('div', { className: 'row center gap-8' },
-          h('span', { className: 'strong', style: { fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' } }, it.name),
-          connected && h('span', { className: 'row center gap-4', style: { fontSize: 10.5, color: 'var(--good)', fontWeight: 600 } }, h('span', { style: { width: 6, height: 6, borderRadius: 99, background: 'var(--good)' } }), 'Verbunden')),
-        h('span', { style: { fontSize: 12, color: 'var(--text-2)' } }, it.detail),
-        h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, it.sub)),
-      h('button', { className: 'btn btn--sm ' + (connected ? 'btn--ghost' : 'btn--primary'), onClick: onToggle, disabled: busy },
+    return h('div', { className: 'ff-setrow' },
+      h('div', { className: 'row center gap-12', style: { flex: 1, minWidth: 0 } },
+        h('div', { style: { width: 38, height: 38, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `color-mix(in srgb, ${b.c} 18%, transparent)`, color: b.c, fontWeight: 800, fontSize: 17 } }, b.glyph),
+        h('div', { className: 'col gap-2', style: { minWidth: 0 } },
+          h('div', { className: 'row center gap-8' },
+            h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap' } }, it.name),
+            connected && h('span', { className: 'row center gap-4', style: { fontSize: 10.5, color: 'var(--good)', fontWeight: 600 } }, h('span', { style: { width: 6, height: 6, borderRadius: 99, background: 'var(--good)' } }), 'Verbunden')),
+          h('span', { style: { fontSize: 11.5, color: 'var(--text-4)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } },
+            connected ? it.sub : it.detail))),
+      h('button', { className: 'btn btn--sm ' + (connected ? 'btn--ghost' : 'btn--primary'), style: { flexShrink: 0 }, onClick: onToggle, disabled: busy },
         busy ? '…' : connected ? 'Trennen' : 'Verbinden'));
   }
 
@@ -134,23 +134,23 @@
 
       h('div', { className: 'col gap-18' },
         h(Card, { title: 'Integrationen', icon: 'link', tour: 'integrations' },
-          h('div', { className: 'col gap-12' }, integrations.map((it) => h(Integration, { key: it.id, it, busy: busy === it.id, onToggle: () => toggle(it.id) })))),
+          h('div', { className: 'col' }, integrations.map((it) => h(Integration, { key: it.id, it, busy: busy === it.id, onToggle: () => toggle(it.id) })))),
         h(Card, { title: 'Synchronisierte Daten', icon: 'refresh' },
-          h('div', { className: 'col gap-10' },
+          h('div', { className: 'col' },
             h(SyncRow, { icon: 'heart', label: 'HRV', src: 'Apple Health', val: `${FF.recovery.hrv.val} ms` }),
             h(SyncRow, { icon: 'moon', label: 'Schlaf', src: 'Apple Health', val: `${fmt.n(FF.recovery.sleep.val, 1)} h` }),
             h(SyncRow, { icon: 'waves', label: 'Ruhepuls', src: 'Apple Health', val: `${FF.recovery.rhr.val} bpm` }),
             h(SyncRow, { icon: 'activity', label: 'Aktivitäten', src: 'Strava', val: '212 gesamt' })),
-          h('div', { className: 'rule', style: { margin: '14px 0' } }),
-          h(AiInsight, { title: 'Automatische Verarbeitung' }, 'Importierte FIT-Dateien werden automatisch in Telemetrie, Zonenverteilung und Trainingsload (TSS) umgerechnet und in die Leistungsdiagnostik übernommen.'))));
+          h('div', { style: { marginTop: 16 } },
+            h(AiInsight, { title: 'Automatische Verarbeitung' }, 'Importierte FIT-Dateien werden automatisch in Telemetrie, Zonenverteilung und Trainingsload (TSS) umgerechnet und in die Leistungsdiagnostik übernommen.')))));
   }
 
   function SyncRow({ icon, label, src, val }) {
-    return h('div', { className: 'row between center', style: { padding: '4px 0' } },
-      h('div', { className: 'row center gap-10' },
-        h('span', { style: { color: 'var(--text-3)' } }, h(Icon, { name: icon, size: 16 })),
-        h('div', { className: 'col' }, h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, label), h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, src))),
-      h('span', { className: 'mono', style: { fontSize: 13, color: 'var(--text-2)' } }, val));
+    return h('div', { className: 'ff-setrow' },
+      h('div', { className: 'row center gap-10', style: { minWidth: 0 } },
+        h('span', { style: { color: 'var(--text-3)', flexShrink: 0 } }, h(Icon, { name: icon, size: 16 })),
+        h('div', { className: 'col gap-1' }, h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, label), h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, src))),
+      h('span', { className: 'mono', style: { fontSize: 13, color: 'var(--text-2)', flexShrink: 0 } }, val));
   }
 
   window.Screens = window.Screens || {};
