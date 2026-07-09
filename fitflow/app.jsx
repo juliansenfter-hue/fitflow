@@ -460,11 +460,13 @@
       if (Onb) return h(Onb, { account: Auth.currentAccount(), onDone: () => bump((n) => n + 1) });
     }
     // authed + onboarded: load the active account's dataset.
-    // Nur das DEMO-Konto zeigt den vollen Beispiel-Datensatz. Ein echtes
-    // (registriertes) Konto bleibt IMMER leer — auch nach dem Onboarding —
-    // bis der Nutzer selbst den ersten Eintrag anlegt.
+    // Das DEMO-Konto zeigt den Beispiel-Datensatz. Ein echtes Konto bleibt im
+    // geführten Leerzustand (Erste-Schritte-Checkliste), BIS es echte
+    // Aktivitäten hat — dann öffnet sich das echte Dashboard, dessen Kennzahlen
+    // vollständig aus den eigenen Importen berechnet werden (FFMetrics).
     const acc = Auth ? Auth.currentAccount() : null;
-    const isEmpty = acc ? !acc.demo : false;
+    const hasData = !!(acc && !acc.demo && acc.email && window.FFImports && FFImports.count(acc) > 0);
+    const isEmpty = acc ? (!acc.demo && !hasData) : false;
     if (Acct) Acct.apply(isEmpty, acc);
     return h(App, { key: acc ? acc.email : 'live' });
   }

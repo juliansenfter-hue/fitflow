@@ -32,6 +32,17 @@
   /* scenic photo backdrop (sharp, full-bleed) */
   const PHOTO_URL = 'https://cdn.hasselblad.com/f/77891/11656x8742/237f663ffc/x-system_02_download.jpg';
 
+  /* looping wallpaper videos (full-bleed, muted) — user-supplied animations.
+     Paths are relative to the document (index.html / FitFlow.html at the app
+     root), matching the onboarding-intro.mp4 convention. */
+  const VIDEOS = [
+    { id: 1, label: 'Animation 1', url: 'fitflow/wallpapers/wallpaper-1.mp4' },
+    { id: 2, label: 'Animation 2', url: 'fitflow/wallpapers/wallpaper-2.mp4' },
+    { id: 3, label: 'Animation 3', url: 'fitflow/wallpapers/wallpaper-3.mp4' },
+    { id: 4, label: 'Animation 4', url: 'fitflow/wallpapers/wallpaper-4.mp4' },
+  ];
+  function videoUrl(id) { const v = VIDEOS.find((x) => x.id === id) || VIDEOS[0]; return v.url; }
+
   /* flat solid-colour backdrops — neutral tones that sit well behind the
      liquid-glass panels (mostly deep darks plus one light option) */
   const SOLID_PRESETS = [
@@ -44,11 +55,12 @@
   ];
 
   const DEFAULTS = {
-    mode: 'etheral',    // beams | etheral | bars | paths | photo | solid
+    mode: 'video',      // beams | etheral | bars | paths | video | photo | solid
     color: '#7C5CFF',   // dominant colour (violet) — used by the animated modes
     solidColor: '#0a0d14', // flat fill colour (solid mode)
-    intensity: 55,      // overall strength (→ layer opacity), 30–100
+    intensity: 50,      // overall strength (→ layer opacity), 30–100
     bars: 15,           // bar count (bars mode)
+    video: 4,           // which wallpaper video (video mode), see VIDEOS — Animation 4 (Thinkogic) ist der Standard-Hintergrund für neue Konten
     photo: null,        // custom uploaded background (data URL); null → scenic default
     photoScale: 1,      // zoom factor for photo (1–3)
     photoX: 50,         // horizontal focus / crop, 0–100 %
@@ -361,6 +373,30 @@
   }
 
   /* ============================================================
+     VIDEO — looping wallpaper animation, muted & full-bleed
+     ============================================================ */
+  function buildVideo() {
+    const vid = document.createElement('video');
+    vid.src = videoUrl(S.video);
+    vid.muted = true; vid.defaultMuted = true;
+    vid.loop = true; vid.autoplay = true;
+    vid.playsInline = true; vid.setAttribute('playsinline', '');
+    vid.setAttribute('webkit-playsinline', '');
+    vid.preload = 'auto';
+    vid.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' +
+      'background-color:#0a0d14;';
+    root.appendChild(vid);
+    // reduced-motion / touch: hold a still frame rather than loop-playing
+    const still = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
+    if (still) { vid.autoplay = false; vid.pause(); }
+    else { const p = vid.play(); if (p && p.catch) p.catch(() => {}); }
+    return () => { try { vid.pause(); vid.removeAttribute('src'); vid.load(); } catch (e) {} };
+  }
+
+  /* ============================================================
      PHOTO — scenic landscape, sharp & full-bleed
      ============================================================ */
   function buildPhoto() {
@@ -393,10 +429,11 @@
     injectStyle();
     if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
     root.innerHTML = '';
-    if (S.mode !== 'photo' && S.mode !== 'solid') buildWash();
+    if (S.mode !== 'photo' && S.mode !== 'solid' && S.mode !== 'video') buildWash();
     if (S.mode === 'etheral') cleanup = buildEtheral();
     else if (S.mode === 'bars') cleanup = buildBars();
     else if (S.mode === 'paths') cleanup = buildPaths();
+    else if (S.mode === 'video') cleanup = buildVideo();
     else if (S.mode === 'photo') cleanup = buildPhoto();
     else if (S.mode === 'solid') cleanup = buildSolid();
     else cleanup = buildBeams();
@@ -406,7 +443,7 @@
     // und bei reduced-motion bleibt es statisch verteilt.
     const still = ((navigator.maxTouchPoints || 0) > 0) || (window.matchMedia &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    root.style.animation = (isRainbow() && !still && S.mode !== 'photo' && S.mode !== 'solid')
+    root.style.animation = (isRainbow() && !still && S.mode !== 'photo' && S.mode !== 'solid' && S.mode !== 'video')
       ? 'ff-hue-cycle 24s linear infinite' : '';
   }
 
@@ -424,14 +461,14 @@
   }
 
   window.FFBackground = {
-    DEFAULTS, PRESETS, SOLID_PRESETS, PHOTO_URL, RAINBOW,
+    DEFAULTS, PRESETS, SOLID_PRESETS, PHOTO_URL, RAINBOW, VIDEOS,
     get() { return Object.assign({}, S); },
     set(partial) {
       const prev = S;
       S = Object.assign({}, S, partial);
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
       // intensity-only change → just fade, no costly rebuild
-      const structural = ['mode', 'color', 'solidColor', 'bars', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
+      const structural = ['mode', 'color', 'solidColor', 'bars', 'video', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
       const photoXform = ['photoScale', 'photoX', 'photoY'].some((k) => k in partial && partial[k] !== prev[k]);
       if (!root) render();
       else if (structural) renderSoon();   // teuren Rebuild auf 1×/Frame drosseln

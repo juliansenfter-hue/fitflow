@@ -126,7 +126,7 @@
       return h('div', { className: 'ff-login' },
         h('div', { className: 'ff-login-scrim' }),
         h('form', { className: 'ff-login-card', onSubmit: isCode ? submitCode : submitForgot, noValidate: true },
-          h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+          h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
           h('h1', { className: 'ff-login-title' }, isCode ? 'Code eingeben' : 'Passwort zurücksetzen'),
           h('p', { className: 'ff-login-sub' }, isCode
             ? `Gib den 6-stelligen Code ein, den wir an ${fEmail} geschickt haben.`
@@ -150,7 +150,7 @@
     return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
       h('div', { className: 'ff-login-scrim' }),
       h('form', { className: 'ff-login-card', onSubmit: isReg ? submitRegister : submitLogin, noValidate: true },
-        h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+        h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
         h('h1', { className: 'ff-login-title' }, isReg ? 'Konto erstellen' : 'Willkommen zurück'),
         h('p', { className: 'ff-login-sub' }, isReg
           ? 'Lege ein neues Profil an — du startest mit einem leeren Trainingstagebuch.'
@@ -223,7 +223,7 @@
     return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
       h('div', { className: 'ff-login-scrim' }),
       h('form', { className: 'ff-login-card', onSubmit: submit, noValidate: true },
-        h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+        h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
         h('h1', { className: 'ff-login-title' }, 'Neues Passwort setzen'),
         h('p', { className: 'ff-login-sub' }, 'Wähle ein neues Passwort für dein Konto.'),
         h('div', { className: 'ff-login-fields' },

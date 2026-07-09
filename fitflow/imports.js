@@ -48,7 +48,10 @@
     add(activity, metaRow, acc) {
       if (!activity) return activity;
       acc = acc || (window.FFAuth && FFAuth.currentAccount && FFAuth.currentAccount());
-      const list = load(acc);
+      let list = load(acc);
+      // dedupe by activity id so a re-run (e.g. a repeated Strava sync) replaces
+      // the existing entry instead of stacking a duplicate.
+      if (activity.id != null) list = list.filter((e) => !(e && e.activity && e.activity.id === activity.id));
       const entry = { activity, meta: metaRow || null };
       list.unshift(entry);
       saveList(acc, list);

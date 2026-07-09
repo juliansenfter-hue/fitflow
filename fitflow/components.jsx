@@ -66,7 +66,7 @@
 
   /* ---- Card / panel ---- */
   function Card({ title, icon, right, children, pad = true, className = '', style, glow, spotlight, info, tour }) {
-    return h('section', { className: `panel ${className}${spotlight ? ' spotlight' : ''}`, 'data-tour': tour, style: { ...style, ...(spotlight ? { '--glow-color': spotlight } : {}), ...(glow ? { boxShadow: 'inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px var(--accent-soft), 0 24px 60px -36px rgba(0,0,0,.8)' } : {}) } },
+    return h('section', { className: `panel ${className}${spotlight ? ' spotlight' : ''}`, 'data-tour': tour, style: { ...style, ...(spotlight ? { '--glow-color': spotlight } : {}), ...(glow ? { boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,.30), inset 1.5px 0 0 rgba(255,255,255,.12), inset -1.5px 0 0 rgba(255,255,255,.08), inset 0 -1.5px 0 rgba(255,255,255,.16), 0 0 0 1px var(--accent-soft), 0 32px 80px -40px rgba(0,0,0,.85)' } : {}) } },
       (title || right) && h('div', { className: 'panel-head', style: { padding: pad ? '20px 24px 0' : '20px 24px 16px', marginBottom: pad ? 0 : 0 } },
         h('div', { className: 'h3' },
           icon && h(Icon, { name: icon, size: 17, style: { color: 'var(--text-3)' } }),

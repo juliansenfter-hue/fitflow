@@ -338,6 +338,10 @@
       return window.FFLive.integrations;
     },
     async connectIntegration(provider) {
+      // Strava on a real account = genuine OAuth via the Supabase Edge Function
+      if (provider === 'strava' && window.FFStrava && window.FFStrava.isReal()) {
+        return window.FFStrava.connect();     // → Strava-Zustimmungsseite (echter Redirect)
+      }
       if (isLive()) {
         const { authUrl } = await request('/integrations/' + provider + '/connect');
         window.location.href = authUrl;       // → Provider-Zustimmungsseite
@@ -348,6 +352,9 @@
       return { connected: true, imported: made };
     },
     async syncIntegration(provider) {
+      if (provider === 'strava' && window.FFStrava && window.FFStrava.isReal()) {
+        return window.FFStrava.sync({ full: true });
+      }
       if (isLive()) {
         const r = await request('/integrations/' + provider + '/sync', { method: 'POST' });
         (r.imported || []).forEach((a) => { reviveDates({ activities: [a] }); window.FFLive.addActivity(a); });
@@ -358,6 +365,9 @@
       return { imported: made };
     },
     async disconnectIntegration(provider) {
+      if (provider === 'strava' && window.FFStrava && window.FFStrava.isReal()) {
+        return window.FFStrava.disconnect();
+      }
       if (isLive()) { await request('/integrations/' + provider, { method: 'DELETE' }); }
       else { await delay(200); }
       window.FFLive.disconnectIntegration(provider);

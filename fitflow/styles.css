@@ -220,22 +220,34 @@ body::after{
 }
 .unit{font-size:.5em;font-weight:500;color:var(--text-3);letter-spacing:0}
 
-/* ---- panel / card — Apple dark material ---- */
+/* ---- panel / card — Liquid Glass (immersive Apple material) ----
+   Thin, clear fill so the backdrop shines through; a real specular rim
+   on all four edges (light from above: bright top, soft secondary
+   reflection along the bottom, as refraction would produce); a diagonal
+   gloss streak across the surface. liquid-glass.js additionally keeps
+   edge refraction + chromatic aberration always on for every glass box. */
 .panel{
   background:
-    linear-gradient(180deg, var(--glass-sheen), rgba(255,255,255,0) 22%),
-    rgba(var(--lg-tint), var(--lg-opacity));
+    linear-gradient(180deg, rgba(255,255,255,calc(var(--lg-sheen) * .10)), rgba(255,255,255,calc(var(--lg-sheen) * .02)) 26%, rgba(255,255,255,0) 44%),
+    linear-gradient(115deg, rgba(255,255,255,calc(var(--lg-sheen) * .07)) 0%, rgba(255,255,255,calc(var(--lg-sheen) * .015)) 22%, rgba(255,255,255,0) 40%),
+    radial-gradient(140% 90% at 50% 118%, rgba(255,255,255,calc(var(--lg-sheen) * .055)), rgba(255,255,255,0) 55%),
+    rgba(var(--lg-tint), calc(var(--lg-opacity) * .5));
   -webkit-backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
   backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
-  border:1px solid var(--glass-edge);
+  border:1px solid rgba(255,255,255,calc(.05 + var(--lg-sheen) * .12));
   border-radius:var(--lg-radius);
   position:relative;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.14),
-    inset 1px 0 0 rgba(255,255,255,.10),
-    0 24px 60px -36px rgba(0,0,0,.8);
+    inset 0 1.5px 0 rgba(255,255,255,calc(.06 + var(--lg-sheen) * .24)),
+    inset 1.5px 0 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .09)),
+    inset -1.5px 0 0 rgba(255,255,255,calc(.02 + var(--lg-sheen) * .06)),
+    inset 0 -1.5px 0 rgba(255,255,255,calc(.04 + var(--lg-sheen) * .12)),
+    inset 0 26px 48px -30px rgba(255,255,255,calc(var(--lg-sheen) * .09)),
+    inset 0 -36px 46px -40px rgba(124,92,255,calc(var(--lg-sheen) * .10)),
+    0 32px 80px -40px rgba(0,0,0,.85);
 }
 .panel>*{position:relative;z-index:1}
+
 .panel--flush{padding:0}
 .panel-pad{padding:22px 24px}
 .ff-hero-card{display:flex;flex-direction:column}
@@ -266,32 +278,47 @@ body::after{
 .btn--primary{background:var(--accent);color:var(--accent-ink)}
 .btn--primary:hover{background:var(--accent-bright)}
 
-/* glass icon buttons (topbar) — circular material buttons */
+/* glass icon buttons (topbar) — perfect circles, hairline edge, quiet */
 .ff-glass-icon{
-  color:var(--text);border-radius:11px !important;
+  color:var(--text-2);border-radius:999px !important;
   background:var(--panel-2) !important;
   -webkit-backdrop-filter:var(--glass-blur-lo);
   backdrop-filter:var(--glass-blur-lo);
-  border:1px solid transparent !important;
-  transition:background .25s var(--ease),transform .18s var(--ease);
+  border:1px solid var(--line) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  transition:background .25s var(--ease),border-color .25s var(--ease),
+    color .25s var(--ease),transform .18s var(--ease);
 }
-.ff-glass-icon:hover{background:var(--panel-3) !important}
-.ff-glass-icon svg{color:var(--text)}
+.ff-glass-icon:hover{
+  background:var(--panel-3) !important;
+  border-color:var(--line-2) !important;
+  color:var(--text);
+}
+.ff-glass-icon:active{transform:scale(.94)}
+.ff-glass-icon svg{color:inherit}
+.ff-glass-icon:focus-visible,.ff-liquid-btn:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
 
-/* primary CTA in the topbar — solid accent pill, calm */
+/* primary CTA in the topbar — filled accent pill, sentence case (Apple) */
 .ff-liquid-btn{
   position:relative;isolation:isolate;
-  color:#fff;border-radius:11px !important;letter-spacing:.04em;height:42px;padding:0 20px;
-  background:rgba(44,44,48,.66) !important;
-  -webkit-backdrop-filter:var(--glass-blur-lo);backdrop-filter:var(--glass-blur-lo);
-  border:1px solid var(--line-2) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 30px -22px rgba(0,0,0,.8);
-  transition:background-color .25s var(--ease),box-shadow .25s var(--ease),transform .18s var(--ease);
+  color:#fff;border-radius:999px !important;height:42px;padding:0 21px;
+  font-size:13px;font-weight:600;letter-spacing:-.01em;text-transform:none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 55%),
+    var(--accent) !important;
+  border:1px solid transparent !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 1px 2px rgba(0,0,0,.35),
+    0 10px 26px -12px var(--accent-glow);
+  transition:background-color .25s var(--ease),box-shadow .25s var(--ease),
+    transform .18s var(--ease),filter .25s var(--ease);
 }
-.ff-liquid-btn:hover{
-  background:rgba(60,60,66,.74) !important;
-}
-.ff-liquid-btn:active{transform:scale(.97)}
+.ff-liquid-btn svg{width:15px;height:15px}
+.ff-liquid-btn:hover{filter:brightness(1.12)}
+.ff-liquid-btn:active{transform:scale(.97);filter:brightness(.96)}
 .btn--ghost{background:var(--panel-2);border-color:transparent;color:var(--text)}
 .btn--ghost:hover{background:var(--panel-3)}
 .btn--outline{border-color:var(--line-2);color:var(--text)}
@@ -551,19 +578,29 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 .grid-3{grid-template-columns:repeat(3,1fr)}
 .grid-4{grid-template-columns:repeat(4,1fr)}
 
-/* metric tile — inner material (like widget cells) */
+/* metric tile — inner material (like widget cells), Liquid Glass scaled
+   down: same specular rim + top sheen as .panel, gentler so the small
+   cells don't outshine their parent card */
 .tile{
-  background:rgba(var(--lg-tint2), var(--lg-opacity-tile));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,calc(var(--lg-sheen) * .09)), rgba(255,255,255,calc(var(--lg-sheen) * .015)) 30%, rgba(255,255,255,0) 52%),
+    rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) * .6));
   -webkit-backdrop-filter:blur(var(--lg-blur-tile)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
   backdrop-filter:blur(var(--lg-blur-tile)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
-  border:1px solid var(--glass-edge-2);border-radius:var(--lg-radius-tile);padding:18px 20px;
+  border:1px solid rgba(255,255,255,calc(.04 + var(--lg-sheen) * .10));border-radius:var(--lg-radius-tile);padding:18px 20px;
   display:flex;flex-direction:column;gap:10px;min-width:0;position:relative;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 1px 0 0 rgba(255,255,255,.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,calc(.05 + var(--lg-sheen) * .21)),
+    inset 1px 0 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .07)),
+    inset -1px 0 0 rgba(255,255,255,calc(.02 + var(--lg-sheen) * .05)),
+    inset 0 -1px 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .10));
 }
 .tile>*{position:relative;z-index:1}
 .tile--clickable{cursor:pointer;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease)}
-.tile--clickable:hover{background:rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) + .08));
-  border-color:var(--glass-edge);transform:translateY(-1px)}
+.tile--clickable:hover{background:
+    linear-gradient(180deg, rgba(255,255,255,calc(.02 + var(--lg-sheen) * .11)), rgba(255,255,255,calc(var(--lg-sheen) * .02)) 30%, rgba(255,255,255,0) 52%),
+    rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) * .6 + .08));
+  border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
 .tile--clickable:active{transform:scale(.99)}
 .tile--clickable .tile-expand{transition:color .25s var(--ease),transform .25s var(--ease)}
 .tile--clickable:hover .tile-expand{color:var(--text)!important;transform:translate(1px,-1px)}
@@ -577,10 +614,10 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
    card lights from its near edge and ramps up on approach.
    ============================================================ */
 .panel,.tile,.ff-topbar{position:relative;--lx:-9999px;--ly:-9999px;
-  /* default (un-named) cards: white light, kept gentle */
+  /* default (un-named) cards: white light — liquid glass catches it a bit harder */
   --glow-color:#ffffff;
-  --glow-rim:.40;   /* edge-light strength */
-  --glow-fill:.045; /* faint inner wash */
+  --glow-rim:.55;   /* edge-light strength */
+  --glow-fill:.06;  /* faint inner wash */
 }
 /* named cards (.spotlight) light up in their own colour, more intensely */
 .spotlight{--glow-color:var(--accent);--glow-rim:1;--glow-fill:.13}
@@ -994,6 +1031,7 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
 .ff-login-mark{width:38px;height:38px;flex-shrink:0}
 .ff-login-mark .ff-logo-mark{width:38px;height:38px}
 .ff-login-word{font-family:var(--font-display,inherit);font-weight:700;font-size:34px;letter-spacing:-.025em;color:#fff;line-height:1}
+.ff-login-logo{display:block;height:54px;width:auto;object-fit:contain;user-select:none}
 .ff-login-title{font-size:23px;font-weight:700;letter-spacing:-.02em;color:#fff;margin:0 0 5px;text-align:center}
 .ff-login-sub{font-size:13px;color:var(--text-3);line-height:1.45;margin:0 0 22px;text-align:center}
 
@@ -1148,7 +1186,8 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
 /* ============================================================
    EMPTY ACCOUNT — onboarding checklist + empty screens
    ============================================================ */
-.ff-ob-wrap{max-width:760px;margin:0 auto}
+.ff-ob-wrap{max-width:1180px;margin:0 auto}
+.ff-ob-card>.panel-pad{padding:34px 40px}
 .ff-ob-card{position:relative;overflow:hidden}
 .ff-ob-card::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(120% 70% at 100% 0,var(--accent-soft),transparent 58%)}
@@ -1459,7 +1498,7 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 /* ============================================================
    DESIGN TAB — scene picker + colour swatches (Apple Settings)
    ============================================================ */
-.ff-bgtiles{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.ff-bgtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .ff-bgtile{position:relative;border:0;padding:0;background:none;cursor:pointer;display:block;
   -webkit-tap-highlight-color:transparent}
 .ff-bgtile-shot{position:relative;display:block;border-radius:12px}
@@ -1606,10 +1645,11 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .ff-actions{display:flex;align-items:center;gap:10px;position:relative}
 .ff-glass-icon.is-on{background:var(--accent-soft) !important;color:var(--accent-bright)}
 .ff-glass-icon.is-on svg{color:var(--accent-bright)}
-.ff-badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;
+.ff-badge{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;padding:0 4px;
   display:flex;align-items:center;justify-content:center;border-radius:99px;
-  background:var(--accent);color:#fff;font-size:10px;font-weight:700;line-height:1;
-  font-variant-numeric:tabular-nums;border:2px solid #000;box-shadow:0 0 0 1px var(--accent-glow)}
+  background:var(--accent);color:#fff;font-size:10px;font-weight:600;line-height:1;
+  font-variant-numeric:tabular-nums;border:2px solid #000;
+  box-shadow:0 2px 6px -2px rgba(0,0,0,.6)}
 
 .ff-pop-backdrop{position:fixed;inset:0;z-index:60;background:transparent}
 .ff-pop{position:absolute;top:calc(100% + 12px);right:0;z-index:61;width:380px;max-width:calc(100vw - 40px);

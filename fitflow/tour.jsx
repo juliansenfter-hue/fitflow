@@ -161,6 +161,10 @@
     };
     const enterApp = () => {
       setSaving(true);
+      // Nach „Los geht's" immer auf dem Dashboard landen — dort zeigt das leere Konto
+      // das „Willkommen / Erste Schritte"-Feld. Ohne das würde die App den zuletzt in
+      // der URL stehenden Tab-Hash (z. B. #design) übernehmen und woanders starten.
+      try { location.hash = 'dashboard'; } catch (e) {}
       const fin = (window.FFAuth && window.FFAuth.completeOnboarding)
         ? window.FFAuth.completeOnboarding(pendingAcc || {}) : Promise.resolve();
       Promise.resolve(fin).then(function () { onDone && onDone(); });
@@ -196,9 +200,12 @@
     if (video) {
       return h('div', { className: 'ff-onb ff-onb--video' },
         h('video', {
-          className: 'ff-onb-video', src: 'fitflow/onboarding-intro.mp4',
+          className: 'ff-onb-video', src: 'fitflow/logo-intro.mp4',
           autoPlay: true, muted: true, playsInline: true, controls: false, preload: 'auto',
           onEnded: function () { setVideoEnded(true); },
+          // Sicherheitsnetz: falls der Browser das Logo-Video nicht abspielen kann
+          // (Format/Autoplay), nicht auf dem schwarzen Video-Screen hängen bleiben.
+          onError: function () { setVideoEnded(true); },
         }),
         videoEnded && h('div', { className: 'ff-welcome' },
           h('img', { className: 'ff-welcome-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false }),

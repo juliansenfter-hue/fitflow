@@ -8,11 +8,19 @@
 
   const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase() || 'FF';
 
-  // pristine demo snapshot (deep enough for our needs)
+  // pristine demo snapshot (deep enough for our needs). load/todayLoad/risk/week
+  // are captured by reference because FFMetrics.apply() REPLACES these globals
+  // (never mutates the originals) — so the demo can always be restored intact
+  // even after a real account recomputed them.
   const SNAP = {
     athlete: JSON.parse(JSON.stringify(FF.athlete)),
     activities: FF.activities.slice(),
     notifications: (FF.notifications || []).slice(),
+    load: FF.load,
+    todayLoad: FF.todayLoad,
+    fitnessScore: FF.fitnessScore,
+    risk: FF.risk,
+    week: FF.week,
   };
 
   function emptyAthlete(acc) {
@@ -26,34 +34,48 @@
     };
   }
 
+  // an onboarded REAL athlete: same shape as emptyAthlete but presented as an
+  // active profile (its performance values still come from the user's onboarding
+  // and stay blank until entered — no demo numbers are borrowed).
+  function realAthlete(acc) {
+    const a = emptyAthlete(acc);
+    a.role = (acc && acc.sport) || 'Athlet';
+    return a;
+  }
+
   const FFAccount = {
     /* mutate FF + FFLive in place to match the active account */
     apply(isEmpty, acc) {
       const Live = window.FFLive;
+      // no account = the not-logged-in login teaser → show demo data behind it.
+      const isDemo = !acc || !!acc.demo;
       if (isEmpty) {
         FF.athlete = emptyAthlete(acc);
         FF.activities.length = 0;
         FF.empty = true;
         FF.zonesSet = false;
         if (Live && Live.setEmptyMode) Live.setEmptyMode(true);
+      } else if (!isDemo) {
+        // REAL onboarded account with data — starts from the user's own
+        // activities only. No demo sessions are injected; every dashboard metric
+        // is computed from the real imports below (FFMetrics), so the numbers are
+        // genuinely theirs. Services stay "available" (honest) until truly linked.
+        FF.athlete = realAthlete(acc);
+        FF.activities.length = 0;
+        FF.empty = false;
+        FF.zonesSet = !!(FF.athlete.thrHr || FF.athlete.ftp);
+        if (Live && Live.setEmptyMode) Live.setEmptyMode(true);
       } else {
-        // restore demo dataset (the populated FitFlow experience)
+        // DEMO account — restore the seeded 16-week story untouched, including
+        // the derived metrics (a real account may have replaced these globals).
         FF.athlete = JSON.parse(JSON.stringify(SNAP.athlete));
-        // a registered athlete who has finished onboarding keeps their identity
-        if (acc && !acc.demo && acc.name) {
-          FF.athlete.name = acc.name;
-          FF.athlete.email = acc.email || FF.athlete.email;
-          FF.athlete.initials = initials(acc.name);
-          if (acc.sport) FF.athlete.role = acc.sport;
-          // aus dem Onboarding-Wizard (user_metadata) übernommene Profilwerte
-          if (acc.height) FF.athlete.height = acc.height;
-          if (acc.weight) FF.athlete.weight = acc.weight;
-          if (acc.age) FF.athlete.age = acc.age;
-          if (acc.sex) FF.athlete.sex = acc.sex;
-          if (acc.goal) FF.athlete.goal = acc.goal;
-        }
         FF.activities.length = 0;
         SNAP.activities.forEach((a) => FF.activities.push(a));
+        FF.load = SNAP.load;
+        FF.todayLoad = SNAP.todayLoad;
+        FF.fitnessScore = SNAP.fitnessScore;
+        FF.risk = SNAP.risk;
+        FF.week = SNAP.week;
         FF.empty = false;
         FF.zonesSet = true;
         if (Live && Live.setEmptyMode) Live.setEmptyMode(false);
@@ -61,6 +83,16 @@
       // re-inject the account's persisted FIT/CSV imports on top of the base
       // dataset (apply runs each render; hydrate is safe to call every time).
       if (window.FFImports && acc && acc.email) window.FFImports.hydrate(acc);
+
+      // real accounts: derive load / CTL-ATL-TSB / risk / week straight from the
+      // (now hydrated) real activity list. Demo keeps its narrative; empty stays empty.
+      if (!isDemo && !FF.empty && window.FFMetrics) {
+        window.FFMetrics.apply(FF.activities);
+      }
+      // reflect a real account's Strava connection into the integrations list
+      // (services were just reset to "available"); safe for empty accounts too,
+      // so the "Dienst verbinden" onboarding step ticks off.
+      if (!isDemo && acc && acc.email && window.FFStrava) window.FFStrava.reflectStatus(acc);
     },
     isEmpty() { return !!FF.empty; },
   };

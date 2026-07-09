@@ -159,7 +159,7 @@
 
   /* miniature live preview of each backdrop mode, recoloured to `color`
      (color 'rainbow' spreads the engine's spectrum + slow hue cycle) */
-  function BgPreview({ mode, color }) {
+  function BgPreview({ mode, color, vid }) {
     const B = window.FFBackground;
     const RB = (B && B.RAINBOW) || ['#ff4d4d', '#ffb13d', '#35d073', '#38b6ff', '#7C5CFF', '#ff4fd8'];
     const rainbow = color === 'rainbow';
@@ -194,15 +194,23 @@
             d: `M-8 ${64 - i * 8} C 22 ${48 - i * 7}, 48 ${10 + i * 5}, 108 ${30 - i * 9}`,
             fill: 'none', stroke: cAt(i), strokeWidth: 0.8 + i * 0.12, strokeOpacity: 0.28 + i * 0.11 }))));
     }
+    if (mode === 'video') {
+      const list = (B && B.VIDEOS) || [];
+      const v = list.find((x) => x.id === vid) || list[0];
+      return h('div', { className: 'ff-bgprev' },
+        v && h('video', { src: v.url, muted: true, loop: true, autoPlay: true, playsInline: true,
+          ref: (el) => { if (el) { el.muted = true; const p = el.play && el.play(); if (p && p.catch) p.catch(() => {}); } },
+          style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }));
+    }
     // photo — reflects a custom uploaded image when present
     const url = (B && B.get().photo) || (B && B.PHOTO_URL);
     return h('div', { className: 'ff-bgprev', style: { background: `#0a0d14 url("${url}") center / cover no-repeat` } });
   }
 
-  function BgTile({ mode, label, active, color, onSelect }) {
+  function BgTile({ mode, label, active, color, vid, onSelect }) {
     return h('button', { className: 'ff-bgtile' + (active ? ' is-active' : ''), onClick: onSelect, type: 'button' },
       h('span', { className: 'ff-bgtile-shot' },
-        h(BgPreview, { mode, color }),
+        h(BgPreview, { mode, color, vid }),
         h('span', { className: 'ff-bgprev-ui', 'aria-hidden': true })),
       h('span', { className: 'ff-bgtile-label' }, label));
   }
@@ -259,12 +267,16 @@
     const upd = (k) => (v) => G.set({ [k]: v });
     const setBg = (k) => (v) => B.set({ [k]: v });
     const onPhoto = (file) => { fileToScaledDataURL(file).then((data) => B.set({ photo: data, mode: 'photo', photoScale: 1, photoX: 50, photoY: 50 })).catch(() => {}); };
-    const MODES = [
-      { id: 'etheral', label: 'Nebel' },
-      { id: 'beams', label: 'Strahlen' },
-      { id: 'bars', label: 'Balken' },
-      { id: 'paths', label: 'Pfade' },
-      { id: 'photo', label: 'Foto' },
+    const SCENES = [
+      { mode: 'etheral', label: 'Nebel' },
+      { mode: 'beams', label: 'Strahlen' },
+      { mode: 'bars', label: 'Balken' },
+      { mode: 'paths', label: 'Pfade' },
+      { mode: 'video', vid: 1, label: 'Animation 1' },
+      { mode: 'video', vid: 2, label: 'Animation 2' },
+      { mode: 'video', vid: 3, label: 'Animation 3' },
+      { mode: 'video', vid: 4, label: 'Animation 4' },
+      { mode: 'photo', label: 'Foto' },
     ];
     const COLORS = ((B && B.PRESETS) || []).map((p) => p.color);
 
@@ -273,10 +285,12 @@
       B && b && h('div', { style: { gridColumn: '1 / -1' } },
         h(Card, { title: 'Hintergrund', icon: 'image', info: 'Wähle eine Szene und Farbe — live hinter allen Glas-Kästchen in jedem Reiter.' },
         h('div', { className: 'ff-bgtiles' },
-          MODES.map((m) => h(BgTile, { key: m.id, mode: m.id, label: m.label, active: b.mode === m.id, color: b.color, onSelect: () => setBg('mode')(m.id) }))),
+          SCENES.map((sc) => h(BgTile, { key: sc.mode + (sc.vid || ''), mode: sc.mode, vid: sc.vid, label: sc.label,
+            active: b.mode === sc.mode && (sc.vid == null || b.video === sc.vid), color: b.color,
+            onSelect: () => B.set(sc.vid != null ? { mode: sc.mode, video: sc.vid } : { mode: sc.mode }) }))),
         b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
         h('div', { className: 'ff-bg-controls' },
-          b.mode !== 'photo' && h('div', { className: 'ff-bg-colorrow' },
+          b.mode !== 'photo' && b.mode !== 'video' && h('div', { className: 'ff-bg-colorrow' },
             h('span', { className: 'ff-gs-label' }, 'Farbe'),
             h(ColorSwatches, { value: b.color, options: COLORS, onChange: setBg('color') })),
           h('div', { className: 'ff-gs-stack' },

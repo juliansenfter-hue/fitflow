@@ -18,12 +18,12 @@
   const DEFAULTS = {
     mode: 'standard',   // standard | polar | prominent
     displace: 0,        // displacement scale (edge distortion intensity) — calm by default
-    blur: 24,           // backdrop blur, px (Apple material)
-    sat: 170,           // saturation, %
+    blur: 10,           // backdrop blur, px (Apple material)
+    sat: 150,           // saturation, %
     bright: 100,        // brightness, %
     chroma: 0,          // chromatic aberration (RGB channel separation)
     radius: 20,         // corner radius, px
-    opacity: 55,        // glass fill alpha, %
+    opacity: 30,        // glass fill alpha, %
     depth: 8,           // edge refraction band depth
     overLight: false,   // tint glass dark (for bright backgrounds)
   };
@@ -70,27 +70,37 @@
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
-  /* ---- full filter: 3 displacement passes (R/G/B) + screen recombine ---- */
-  function dispFilter(w, h, radius) {
-    const m = MODES[S.mode] || MODES.standard;
-    const depth = Math.max(1, Math.round(S.depth * m.depthMul));
-    const strength = S.displace * m.strMul;
+  /* ---- full filter: displacement pass(es) + optional chromatic split ----
+     With chroma off (the liquid default) a single displacement pass is used —
+     one third of the raster cost of the R/G/B triple. That matters now that
+     EVERY panel refracts: 3-pass on all cards at once wedges the compositor.
+     Turning the chroma slider up still buys the full 3-pass aberration. */
+  function dispFilter(w, h, radius, cfg) {
+    const c = cfg || S;
+    const m = MODES[c.mode] || MODES.standard;
+    const depth = Math.max(1, Math.round(c.depth * m.depthMul));
+    const strength = c.displace * m.strMul;
     const map = dispMap(w, h, radius, depth, m.band);
-    const s1 = strength + S.chroma * 2, s2 = strength + S.chroma, s3 = strength;
-    const svg =
+    const head =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
       `<defs><filter id="d" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">` +
-      `<feImage x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" href="${map}" result="m"/>` +
-      `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s1}" xChannelSelector="R" yChannelSelector="G" result="dR"/>` +
-      `<feColorMatrix in="dR" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="cR"/>` +
-      `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s2}" xChannelSelector="R" yChannelSelector="G" result="dG"/>` +
-      `<feColorMatrix in="dG" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="cG"/>` +
-      `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s3}" xChannelSelector="R" yChannelSelector="G" result="dB"/>` +
-      `<feColorMatrix in="dB" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="cB"/>` +
-      `<feBlend in="cR" in2="cG" mode="screen" result="rg"/>` +
-      `<feBlend in="rg" in2="cB" mode="screen"/>` +
-      `</filter></defs></svg>#d`;
-    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+      `<feImage x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" href="${map}" result="m"/>`;
+    let body;
+    if ((c.chroma || 0) < 0.5) {
+      body = `<feDisplacementMap in="SourceGraphic" in2="m" scale="${strength}" xChannelSelector="R" yChannelSelector="G"/>`;
+    } else {
+      const s1 = strength + c.chroma * 2, s2 = strength + c.chroma, s3 = strength;
+      body =
+        `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s1}" xChannelSelector="R" yChannelSelector="G" result="dR"/>` +
+        `<feColorMatrix in="dR" type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="cR"/>` +
+        `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s2}" xChannelSelector="R" yChannelSelector="G" result="dG"/>` +
+        `<feColorMatrix in="dG" type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="cG"/>` +
+        `<feDisplacementMap in="SourceGraphic" in2="m" scale="${s3}" xChannelSelector="R" yChannelSelector="G" result="dB"/>` +
+        `<feColorMatrix in="dB" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="cB"/>` +
+        `<feBlend in="cR" in2="cG" mode="screen" result="rg"/>` +
+        `<feBlend in="rg" in2="cB" mode="screen"/>`;
+    }
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(head + body + `</filter></defs></svg>`) + '#d';
   }
 
   /* ---- style one panel/tile for its current size ----
@@ -103,7 +113,19 @@
     const cs = getComputedStyle(el);
     const radius = Math.max(1, Math.round(parseFloat(cs.borderTopLeftRadius) || S.radius));
     const brightness = S.overLight ? Math.min(62, S.bright - 50) : S.bright;
-    const plain = `blur(${S.blur}px) saturate(${S.sat}%) brightness(${brightness}%)`;
+    const cfg = S;
+    // Liquid Glass material: reads "thicker" than plain frost — a touch more
+    // blur + saturation on every glass box. The clear fill, specular rims and
+    // gloss streak live in styles.css (.panel/.tile); real edge refraction
+    // stays a Design-tab opt-in (displace slider) because even one SVG
+    // displacement pass per card wedges the compositor on weaker machines.
+    // "Thicker glass" bump: proportional statt pauschal +4/+20. Bei den Standard-
+    // Werten (blur 24 / sat 170) ergibt das praktisch dasselbe (≈28px / ≈190%),
+    // aber wenn der Nutzer Unschärfe/Sättigung Richtung Minimum zieht, verschwindet
+    // der Frost-Boden vollständig — das Kästchen wird wieder wirklich klar/durchlässig.
+    const blur = S.blur * 1.18;
+    const sat = Math.min(220, Math.round(S.sat * 1.12));
+    const plain = `blur(${blur}px) saturate(${sat}%) brightness(${brightness}%)`;
     // Effective edge-refraction strength. When it's ~0 (the calm default) the SVG
     // displacement filter produces no visible refraction anyway — but swapping a
     // box's backdrop to a url(<svg>) filter makes it render flat/dark for a frame
@@ -111,11 +133,15 @@
     // standard look, then the settings apply ~1s later" flash. So only attach the
     // expensive SVG filter when refraction is actually turned on; otherwise use
     // the plain, instant backdrop-filter (identical to what the CSS already paints).
-    const m = MODES[S.mode] || MODES.standard;
-    const strength = S.displace * m.strMul + S.chroma * 2;
+    const m = MODES[cfg.mode] || MODES.standard;
+    const strength = cfg.displace * m.strMul + cfg.chroma * 2;
     let bf = plain;
-    if (strength > 0.5) {
-      try { bf = `url('${dispFilter(w, h, radius)}') ${plain}`; }
+    // Tiles skip the displacement filter: their bevel band is a few px and
+    // visually indistinguishable from the CSS rim, but each SVG filter costs
+    // a full backdrop raster pass — on a card wall that wedges the compositor.
+    const isTile = el.classList.contains('tile');
+    if (!isTile && strength > 0.5) {
+      try { bf = `url('${dispFilter(w, h, radius, cfg)}') ${plain}`; }
       catch (e) { bf = plain; }
     }
     el.style.backdropFilter = bf;
@@ -127,9 +153,14 @@
     const root = document.documentElement.style;
     const op = (S.opacity / 100);
     root.setProperty('--lg-opacity', op.toFixed(3));
-    root.setProperty('--lg-opacity-tile', Math.min(0.85, Math.max(0.04, op * 0.92)).toFixed(3));
+    root.setProperty('--lg-opacity-tile', Math.min(0.85, Math.max(0, op * 0.92)).toFixed(3));
+    // Schimmer-/Glanz-Intensität folgt dem Deckkraft-Regler (0–55) → 0..1.
+    // So blenden die weißen Glas-Reflex-Schichten mit aus, wenn der Nutzer die
+    // Deckkraft senkt — bei Minimum wird das Kästchen wirklich durchlässig
+    // (nur Haarlinien-Kante + Blur), statt einen fixen milchigen Film zu behalten.
+    root.setProperty('--lg-sheen', Math.max(0, Math.min(1, S.opacity / 55)).toFixed(3));
     root.setProperty('--lg-blur', S.blur + 'px');
-    root.setProperty('--lg-blur-tile', Math.round(S.blur * 1.2 + 4) + 'px');
+    root.setProperty('--lg-blur-tile', Math.round(S.blur * 1.4) + 'px');
     root.setProperty('--lg-sat', S.sat + '%');
     root.setProperty('--lg-bright', (S.overLight ? Math.min(62, S.bright - 50) : S.bright) + '%');
     root.setProperty('--lg-radius', S.radius + 'px');
