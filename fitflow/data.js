@@ -632,7 +632,10 @@
     const title = s.name || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
       : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
     const date = s.start_date ? new Date(s.start_date) : (opts.date || TODAY);
-    const calories = s.calories || (s.kilojoules ? Math.round(s.kilojoules) : Math.round(durMin * (sport === 'bike' ? 10 : sport === 'run' ? 12 : 6)));
+    // Only real Strava figures — Strava's own calories, or kilojoules (≈ kcal for
+    // cycling). If it delivers neither, leave it empty ("keine Angabe") rather than
+    // inventing a duration-based estimate.
+    const calories = s.calories || (s.kilojoules ? Math.round(s.kilojoules) : null);
 
     return mkActivity({
       sport, title, date, imported: true,

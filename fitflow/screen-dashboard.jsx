@@ -167,17 +167,36 @@
      Drei Bereiche (gering aerob / hoch aerob / anaerob) in Minuten je Zeitraum;
      daraus wird die Verteilungsform abgeleitet (polarisiert / pyramidal / Schwelle). */
   const FOKUS_RANGES = [
-    { key: '7d',  label: '7 T',  data: { low: 320,  mid: 40,  high: 60  } },
-    { key: '14d', label: '14 T', data: { low: 610,  mid: 95,  high: 105 } },
-    { key: '4w',  label: '4 W',  data: { low: 1180, mid: 260, high: 180 } },
-    { key: '6w',  label: '6 W',  data: { low: 1650, mid: 520, high: 230 } },
-    { key: '8w',  label: '8 W',  data: { low: 2000, mid: 860, high: 280 } },
+    { key: '7d',  label: '7 T',  days: 7 },
+    { key: '14d', label: '14 T', days: 14 },
+    { key: '4w',  label: '4 W',  days: 28 },
+    { key: '6w',  label: '6 W',  days: 42 },
+    { key: '8w',  label: '8 W',  days: 56 },
   ];
   const FOKUS_BUCKETS = [
     { key: 'low',  label: 'Gering aerob', zone: 'z1', desc: 'GA1 · lockere Ausdauer' },
     { key: 'mid',  label: 'Hoch aerob',   zone: 'z4', desc: 'GA2 · Schwelle' },
     { key: 'high', label: 'Anaerob',      zone: 'z5', desc: 'VO₂max · Sprints' },
   ];
+  /* Real intensity distribution from the athlete's own activities in a time
+     window — minutes per bucket from each activity's HR-zone breakdown
+     (Z1+Z2 → base, Z3+Z4 → high-aerobic, Z5 → anaerobic). No demo fallback:
+     if there are no zone minutes in the window the card shows "Keine Angabe". */
+  function fokusFromActivities(days) {
+    const cutoff = FF.TODAY.getTime() - days * 86400000;
+    let low = 0, mid = 0, high = 0;
+    (FF.activities || []).forEach((a) => {
+      if (!a || !a.date) return;
+      const t = (a.date instanceof Date ? a.date : new Date(a.date)).getTime();
+      if (isNaN(t) || t < cutoff) return;
+      const z = Array.isArray(a.zoneMin) ? a.zoneMin : null;
+      if (!z) return;
+      low += (z[0] || 0) + (z[1] || 0);
+      mid += (z[2] || 0) + (z[3] || 0);
+      high += (z[4] || 0);
+    });
+    return { low: Math.round(low), mid: Math.round(mid), high: Math.round(high) };
+  }
   function fokusVerdict(p) { /* p = Prozentanteile {low, mid, high} */
     if (p.mid >= 25) return { t: 'Schwelle', c: 'z4',
       text: `Mit ${p.mid} % liegt ein großer Teil deiner Arbeit im hoch aeroben Bereich rund um die Schwelle — schwellenorientiertes Training. Achte auf ausreichend lockere Einheiten zur Erholung.` };
@@ -213,22 +232,30 @@
           onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }));
     }
     const r = FOKUS_RANGES.find((x) => x.key === range);
-    const total = r.data.low + r.data.mid + r.data.high;
+    const rangeTabs = h(Tabs, { items: FOKUS_RANGES.map((x) => ({ value: x.key, label: x.label })), value: range, onChange: setRange });
+    const data = fokusFromActivities(r.days);
+    const total = data.low + data.mid + data.high;
+    if (!total) {
+      return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
+          info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.', right: rangeTabs },
+        h(CardEmpty, { icon: 'flame', title: 'Keine Angabe',
+          hint: `Im gewählten Zeitraum (${r.label}) liegen keine Aktivitäten mit Zonendaten vor.` }));
+    }
     const pct = {
-      low:  Math.round(r.data.low  / total * 100),
-      mid:  Math.round(r.data.mid  / total * 100),
-      high: Math.round(r.data.high / total * 100),
+      low:  Math.round(data.low  / total * 100),
+      mid:  Math.round(data.mid  / total * 100),
+      high: Math.round(data.high / total * 100),
     };
     /* Rundungsrest auf den größten Anteil schlagen, damit die Summe 100 ergibt */
     pct.low += 100 - (pct.low + pct.mid + pct.high);
     const v = fokusVerdict(pct);
     return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
         info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.',
-        right: h(Tabs, { items: FOKUS_RANGES.map((x) => ({ value: x.key, label: x.label })), value: range, onChange: setRange }) },
+        right: rangeTabs },
       h('div', { className: 'col', style: { gap: 18, flex: 1, justifyContent: 'center' } },
         /* Drei Intensitätsbereiche als schlanke Verlaufs-Balken */
         h('div', { className: 'col', style: { gap: 15 } }, FOKUS_BUCKETS.map((b) =>
-          h(FokusRow, { key: b.key + range, b, pct: pct[b.key], dur: fmt.dur(r.data[b.key]) }))),
+          h(FokusRow, { key: b.key + range, b, pct: pct[b.key], dur: fmt.dur(data[b.key]) }))),
         h('div', { className: 'rule', style: { margin: 0 } }),
         /* Auswertung des Zeitraums */
         h('div', { className: 'row between center' },
@@ -403,8 +430,10 @@
         h('div', { className: 'col', style: { gap: 4, marginTop: 'auto', paddingTop: 10 } },
           h('div', { className: 'row', style: { alignItems: 'baseline', gap: 5, minWidth: 0 } },
             h('span', { className: 'metric', style: { fontSize: valueSize, lineHeight: .9, letterSpacing: '-.02em' } }, displayValue),
-            h('span', { className: 'unit' }, unit)),
-          base && showData && h('div', { className: 'row center', style: { minHeight: 22 } }, base)),
+            showData && h('span', { className: 'unit' }, unit)),
+          showData
+            ? (base && h('div', { className: 'row center', style: { minHeight: 22 } }, base))
+            : h('div', { className: 'row center', style: { minHeight: 22, fontSize: 11.5, color: 'var(--text-4)' } }, 'Keine Angabe')),
         /* full-width sparkline */
         spark && showData && h('div', { style: { marginTop: 10, width: '100%' } },
           h(C.Sparkline, { data: displaySpark, w: 260, hgt: 40, color: sparkColor || 'accent', fill: true, responsive: true })),
@@ -535,21 +564,33 @@
     }
     const addPin = (i) => { if (i == null) return; setPins((p) => p.includes(i) ? p : (p.length >= 3 ? [...p.slice(1), i] : [...p, i])); };
     const removePin = (i) => setPins((p) => p.filter((x) => x !== i));
-    const rhythm = [3.2, 9.6, 4.8, 9.2, 3.0, 8.4, 6.1];
-    const rhythmMeta = [
-      { total: 45, activities: 1, avg: 45 },   // Mo
-      { total: 150, activities: 2, avg: 75 },  // Di
-      { total: 70, activities: 1, avg: 70 },   // Mi
-      { total: 135, activities: 2, avg: 68 },  // Do
-      { total: 40, activities: 1, avg: 40 },   // Fr
-      { total: 120, activities: 1, avg: 120 }, // Sa
-      { total: 85, activities: 1, avg: 85 },   // So
-    ];
     const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
     const dayShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    // Real weekly rhythm: minutes + activity count per weekday, from the athlete's
+    // own activities. No demo values — an empty account already returned above.
+    const rhythmMeta = dayShort.map(() => ({ total: 0, activities: 0, avg: 0 }));
+    let firstT = Infinity, lastT = -Infinity;
+    (FF.activities || []).forEach((a) => {
+      if (!a || !a.date) return;
+      const d = a.date instanceof Date ? a.date : new Date(a.date);
+      if (isNaN(d)) return;
+      const wd = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+      rhythmMeta[wd].total += a.duration || 0;
+      rhythmMeta[wd].activities += 1;
+      const t = d.getTime(); if (t < firstT) firstT = t; if (t > lastT) lastT = t;
+    });
+    rhythmMeta.forEach((m) => { m.total = Math.round(m.total); m.avg = m.activities ? Math.round(m.total / m.activities) : 0; });
+    const maxTot = Math.max(1, ...rhythmMeta.map((m) => m.total));
+    const rhythm = rhythmMeta.map((m) => +((m.total / maxTot) * 10).toFixed(1)); // 0–10 radar scale
     const totMin = rhythmMeta.reduce((s, d) => s + d.total, 0);
     const totAct = rhythmMeta.reduce((s, d) => s + d.activities, 0);
-    const avgDur = Math.round(totMin / totAct);
+    const avgDur = totAct ? Math.round(totMin / totAct) : 0;
+    const weeksSpan = Math.max(1, Math.round((lastT - firstT) / (7 * 86400000)) || 1);
+    const perWeek = (totAct / weeksSpan);
+    // busiest 1–2 weekdays by total time
+    const activeDays = rhythmMeta.map((m, i) => ({ i, total: m.total }))
+      .filter((x) => x.total > 0).sort((a, b) => b.total - a.total).slice(0, 2)
+      .map((x) => dayShort[x.i]).join(' · ') || '–';
     const pinned = pins.length > 0;
     const hd = !pinned && hoverDay != null ? rhythmMeta[hoverDay] : null;
 
@@ -581,9 +622,9 @@
     } else {
       block = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 } },
         hd ? cell(dayNames[hoverDay], fmt.dur(hd.total), 'Gesamtzeit')
-           : cell('Aktivste Tage', 'Di · Do', 'Qualitätseinheiten'),
+           : cell('Aktivste Tage', activeDays, 'nach Trainingszeit'),
         hd ? cell('Aktivitäten', hd.activities, hd.activities === 1 ? 'Einheit' : 'Einheiten')
-           : cell('Ø Einh. / Woche', '6,2', 'pro Woche'),
+           : cell('Ø Einh. / Woche', fmt.n(perWeek, 1), 'pro Woche'),
         hd ? cell('Ø Zeit', fmt.dur(hd.avg), 'je Einheit')
            : cell('Ø Dauer', fmt.dur(avgDur), 'je Einheit'));
     }
@@ -710,56 +751,59 @@
       { zone: 'z3', value: w.intensity.z3, label: 'Z3' }, { zone: 'z4', value: w.intensity.z4, label: 'Z4' },
       { zone: 'z5', value: w.intensity.z5, label: 'Z5' },
     ];
-    // fresh account with no imported activities → render clean empty states
-    // everywhere instead of the seeded demo values (recovery / vitals / focus).
-    const noData = !FF.activities.length;
+    // Two independent "no data" signals so we never show fabricated numbers:
+    //  • noActivities → training-derived cards (load, risk, focus, week, activities)
+    //  • noVitals     → recovery/vitals cards, which have NO source on a real or
+    //                   Strava account (Strava doesn't deliver HRV/sleep/RHR …).
+    const noActivities = !FF.activities.length;
+    const noVitals = !FF.hasVitals;
 
     return h('div', { className: 'ff-grid', style: { gap: 18 } },
       /* ---------- HERO ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18, alignItems: 'stretch' }, 'data-hero': true },
         /* Left column: recommendation + Belastungsbalance + Trainingsfokus below it */
         h('div', { className: 'col', style: { gap: 18 } },
-          noData
+          noVitals
             ? h(Card, { title: 'Heutige Empfehlung', icon: 'spark' },
-                h(CardEmpty, { icon: 'spark', title: 'Noch keine Empfehlung',
-                  hint: 'Sobald Aktivitäten und Erholungsdaten vorliegen, erscheint hier deine tägliche Trainingsempfehlung.',
-                  onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }))
+                h(CardEmpty, { icon: 'spark', title: 'Keine Angabe',
+                  hint: 'Für die tägliche Empfehlung fehlen Erholungsdaten (HRV, Schlaf, Ruhepuls). Strava liefert diese nicht — trage sie in den Vital-Kacheln manuell ein.',
+                  onNav, ctaRoute: 'profil', cta: 'Zum Profil' }))
             : h(EmpfehlungContent, { rec, reco, view: heroView, setView: setHeroView, checkin, setCheckin, showCheckin: mods.checkin }),
-          mods.risk && h(RiskBar, { risk: FF.risk, noData }),
-          h(TrainingsfokusCard, { noData, onNav })),
+          mods.risk && h(RiskBar, { risk: FF.risk, noData: noActivities }),
+          h(TrainingsfokusCard, { noData: noActivities, onNav })),
         /* Vitals 3x2 — Zeilen strecken sich über die volle Spaltenhöhe */
         h('div', { className: 'col', style: { gap: 18, height: '100%' } },
         h('div', { className: 'ff-grid grid-2', style: { gap: 18, gridTemplateRows: 'repeat(3, 1fr)', flex: 1, minHeight: 0 } },
-          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)', noData,
+          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'hrv' ? 'reco' : 'hrv')), active: heroView === 'hrv',
             base: h(Delta, { value: rec.hrv.val - rec.hrv.base, unit: ' ms', suffix: ' Baseline' }),
             spark: VITAL_DATA.hrv.hist, sparkColor: VITAL_DATA.hrv.color, manualHint: 'z. B. 68' }),
-          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)', noData,
+          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'sleep' ? 'reco' : 'sleep')), active: heroView === 'sleep',
             base: h(Delta, { value: +(rec.sleep.val - 8).toFixed(1), unit: ' h', suffix: ' vs. Ziel' }),
             spark: VITAL_DATA.sleep.hist, sparkColor: VITAL_DATA.sleep.color, manualHint: 'z. B. 7,4' }),
-          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)', noData,
+          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'rhr' ? 'reco' : 'rhr')), active: heroView === 'rhr',
             base: h(Delta, { value: rec.rhr.val - rec.rhr.base, unit: ' bpm', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.rhr.hist, sparkColor: VITAL_DATA.rhr.color, manualHint: 'z. B. 49' }),
-          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)', noData,
+          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'resp' ? 'reco' : 'resp')), active: heroView === 'resp',
             base: h(Delta, { value: 14 - 15, unit: ' /min', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.resp.hist, sparkColor: VITAL_DATA.resp.color, manualHint: 'z. B. 14' }),
-          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)', noData,
+          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'spo2' ? 'reco' : 'spo2')), active: heroView === 'spo2',
             base: h(Delta, { value: 98 - 97, unit: ' %', suffix: ' Baseline' }),
             spark: VITAL_DATA.spo2.hist, sparkColor: VITAL_DATA.spo2.color, manualHint: 'z. B. 98' }),
-          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)', noData,
+          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'bp' ? 'reco' : 'bp')), active: heroView === 'bp',
             base: h(Delta, { value: 118 - 120, unit: ' mmHg', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.bp.hist, sparkColor: VITAL_DATA.bp.color, manualHint: 'z. B. 118/76' })))),
 
       /* ---------- FORM / FITNESS ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
-        h(FormFitnessCard, { onNav, allowSim: mods.sim, noData }),
+        h(FormFitnessCard, { onNav, allowSim: mods.sim, noData: noActivities }),
         /* Weekly rhythm */
-        h(WochenrhythmusCard, { noData, onNav })),
+        h(WochenrhythmusCard, { noData: noActivities, onNav })),
 
       /* ---------- WEEKLY GOALS + ACTIVITIES ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },

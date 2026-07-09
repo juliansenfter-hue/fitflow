@@ -53,7 +53,7 @@
         h(M, { label: 'Dauer', value: fmt.dur(a.duration) }),
         a.distance && h(M, { label: 'Distanz', value: fmt.n(a.distance, 1), unit: 'km' }),
         a.elevation && h(M, { label: 'Höhenmeter', value: fmt.big(a.elevation), unit: 'm' }),
-        h(M, { label: 'Kalorien', value: fmt.big(a.calories), unit: 'kcal' }),
+        h(M, { label: 'Kalorien', value: a.calories != null ? fmt.big(a.calories) : '–', unit: a.calories != null ? 'kcal' : '' }),
         h(M, { label: 'Trainingsload', value: a.tss, unit: 'TSS', color: intCol }),
         a.avgPower && h(M, { label: 'Ø Leistung', value: a.avgPower, unit: 'W', color: 'sport-bike' }),
         a.maxPower && h(M, { label: 'Max Leistung', value: a.maxPower, unit: 'W' }),
@@ -81,7 +81,7 @@
       { k: 'tss', l: 'Load (TSS)', f: (a) => a.tss, raw: (a) => a.tss, color: 'z4' },
       { k: 'avgHr', l: 'Ø HF (bpm)', f: (a) => a.avgHr, raw: (a) => a.avgHr, color: 'z5' },
       { k: 'avgPower', l: 'Ø Leistung (W)', f: (a) => a.avgPower || '–', raw: (a) => a.avgPower || 0, color: 'sport-bike' },
-      { k: 'calories', l: 'Kalorien', f: (a) => fmt.big(a.calories), raw: (a) => a.calories },
+      { k: 'calories', l: 'Kalorien', f: (a) => a.calories != null ? fmt.big(a.calories) : '–', raw: (a) => a.calories || 0 },
       { k: 'rpe', l: 'RPE', f: (a) => `${a.rpe}/10`, raw: (a) => a.rpe },
     ];
     return h('div', { className: 'col gap-2' },

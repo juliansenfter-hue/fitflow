@@ -80,6 +80,12 @@
         FF.zonesSet = true;
         if (Live && Live.setEmptyMode) Live.setEmptyMode(false);
       }
+      // Only the DEMO account carries real recovery/vital data (HRV, sleep, RHR …).
+      // A real account (incl. Strava) has NO source for these — Strava doesn't
+      // deliver them — so the dashboard must show "keine Angabe" instead of the
+      // seeded demo numbers, until the user enters them manually.
+      FF.hasVitals = isDemo;
+
       // re-inject the account's persisted FIT/CSV imports on top of the base
       // dataset (apply runs each render; hydrate is safe to call every time).
       if (window.FFImports && acc && acc.email) window.FFImports.hydrate(acc);
