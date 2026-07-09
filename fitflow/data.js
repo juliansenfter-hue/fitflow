@@ -490,8 +490,10 @@
     const durH = durMin / 60;
     const distKm = p.distance != null ? +(p.distance / 1000).toFixed(1) : null;
 
-    // intensity factor + TSS: power-based for bike, HR-based otherwise
-    let tss, iF = null;
+    // intensity factor + TSS: power-based for bike, HR-based otherwise. ONLY from
+    // real signals — no duration guess. Without power+FTP or HR+threshold-HR, tss
+    // stays null → "Keine Angabe".
+    let tss = null, iF = null;
     const npOrAvg = p.np || p.avgPower;
     if (npOrAvg && athlete.ftp) {
       iF = npOrAvg / athlete.ftp;
@@ -499,8 +501,6 @@
     } else if (p.avgHr && athlete.thrHr) {
       const hrIf = p.avgHr / athlete.thrHr;
       tss = Math.max(1, Math.round(durH * hrIf * hrIf * 100));
-    } else {
-      tss = Math.max(1, Math.round(durMin * 0.8));
     }
 
     // avg pace (s/km) for running
@@ -508,9 +508,11 @@
     const spd = p.avgSpeed || (p.distance && p.duration ? p.distance / p.duration : null);
     if (sport === 'run' && spd) avgPace = Math.round(1000 / spd);
 
-    // zone minutes: bucket the HR stream against the athlete's zones, else estimate
+    // zone minutes: bucket the REAL HR stream against the athlete's zones; else a
+    // power-based split (real iF). No HR stream and no power → null ("Keine Angabe"),
+    // never a default guess distribution.
     const hrStream = p.records ? p.records.map((r) => r.hr).filter((v) => v != null) : [];
-    let zoneMin;
+    let zoneMin = null;
     if (hrStream.length > 8 && athlete.thrHr) {
       const buckets = [0, 0, 0, 0, 0];
       hrStream.forEach((hr) => {
@@ -521,8 +523,8 @@
       });
       const tot = hrStream.length;
       zoneMin = buckets.map((c) => Math.round((c / tot) * durMin));
-    } else {
-      const w = iF && iF > 0.9 ? [10, 20, 12, 10, 12] : iF && iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
+    } else if (iF != null) {
+      const w = iF > 0.9 ? [10, 20, 12, 10, 12] : iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
       zoneMin = zoneDist(durMin, w);
     }
 
@@ -558,8 +560,11 @@
     else { const pw = down('power'); if (pw) streams.power = pw; }
     const cad = down('cadence'); if (cad) streams.cadence = cad;
 
-    const hard = iF != null ? iF > 0.9 : (avgPace && athlete.runThrPace ? avgPace < athlete.runThrPace : false);
-    const intensity = hard ? 'Hard' : (iF != null ? (iF > 0.75 ? 'Tempo' : 'Easy') : 'Tempo');
+    // intensity label only from a real basis (power / pace vs. threshold); else null
+    let intensity = null;
+    if (iF != null) intensity = iF > 0.9 ? 'Hard' : iF > 0.75 ? 'Tempo' : 'Easy';
+    else if (avgPace && athlete.runThrPace) intensity = avgPace < athlete.runThrPace ? 'Hard' : 'Easy';
+    const hard = intensity === 'Hard';
     const title = opts.title
       || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
         : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
@@ -570,8 +575,8 @@
       sport, title, date, imported: true, fileName: fname,
       duration: durMin, distance: distKm,
       elevation: p.elevation != null ? p.elevation : null,
-      calories: p.calories != null ? p.calories : Math.round(durMin * (sport === 'bike' ? 10 : sport === 'run' ? 12 : 6)),
-      tss, rpe: Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))),
+      calories: p.calories != null ? p.calories : null,
+      tss, rpe: tss != null ? Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))) : null,
       avgPower: p.avgPower || null, maxPower: p.maxPower || null, np: p.np || null,
       avgHr: p.avgHr || null, maxHr: p.maxHr || null,
       avgCad: p.avgCad || null, maxCad: p.maxCad || null, avgPace,
@@ -606,29 +611,41 @@
     const FTP = Number(athlete.ftp) || 0;
     const THR = Number(athlete.thrHr) || 0;
 
-    let tss, iF = null;
+    // Training-Load (TSS) ONLY from real signals: power+FTP, HR+threshold-HR, or
+    // Strava's own Relative Effort (suffer_score). No duration guess — if none of
+    // these exist, tss stays null → "Keine Angabe".
+    let tss = null, iF = null;
     const powerRef = np || avgPower;
     if (powerRef && FTP) { iF = powerRef / FTP; tss = Math.max(1, Math.round(durH * iF * iF * 100)); }
     else if (avgHr && THR) { const hr = avgHr / THR; tss = Math.max(1, Math.round(durH * hr * hr * 100)); }
     else if (s.suffer_score) { tss = Math.max(1, Math.round(s.suffer_score)); }
-    else { tss = Math.max(1, Math.round(durMin * 0.7)); }
 
     let avgPace = null;
     const spd = s.average_speed || (s.distance && s.moving_time ? s.distance / s.moving_time : null);
     if (sport === 'run' && spd) avgPace = Math.round(1000 / spd);
 
-    let zoneMin;
+    // Zone minutes ONLY from a real intensity signal (HR or power). Never a default
+    // guess distribution — otherwise null ("Keine Angabe").
+    let zoneMin = null;
     if (avgHr && THR) {
       const frac = avgHr / THR;
       const w = frac > 0.98 ? [6, 14, 14, 16, 10] : frac > 0.9 ? [10, 24, 14, 8, 4] : frac > 0.82 ? [16, 34, 8, 2, 0] : [26, 26, 4, 0, 0];
       zoneMin = zoneDist(durMin, w);
-    } else {
-      const w = iF && iF > 0.9 ? [10, 20, 12, 10, 12] : iF && iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
+    } else if (iF != null) {
+      const w = iF > 0.9 ? [10, 20, 12, 10, 12] : iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
       zoneMin = zoneDist(durMin, w);
     }
 
-    const hard = iF != null ? iF > 0.9 : (avgPace && athlete.runThrPace ? avgPace < athlete.runThrPace : (s.suffer_score > 80));
-    const intensity = hard ? 'Hard' : (iF != null ? (iF > 0.75 ? 'Tempo' : 'Easy') : 'Tempo');
+    // Intensity label only from a real basis (power / pace vs. threshold / Relative
+    // Effort); otherwise null ("Keine Angabe").
+    let intensity = null;
+    if (iF != null) intensity = iF > 0.9 ? 'Hard' : iF > 0.75 ? 'Tempo' : 'Easy';
+    else if (avgPace && athlete.runThrPace) intensity = avgPace < athlete.runThrPace ? 'Hard' : 'Easy';
+    else if (s.suffer_score) intensity = s.suffer_score > 80 ? 'Hard' : 'Tempo';
+    const hard = intensity === 'Hard';
+    // RPE is derived from TSS — no TSS, no honest RPE.
+    const rpe = tss != null ? Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))) : null;
+
     const title = s.name || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
       : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
     const date = s.start_date ? new Date(s.start_date) : (opts.date || TODAY);
@@ -641,7 +658,7 @@
       sport, title, date, imported: true,
       duration: durMin, distance: distKm,
       elevation: s.total_elevation_gain != null ? Math.round(s.total_elevation_gain) : null,
-      calories, tss, rpe: Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))),
+      calories, tss, rpe,
       avgPower, maxPower: s.max_watts || null, np,
       avgHr, maxHr,
       avgCad: s.average_cadence ? Math.round(s.average_cadence * (sport === 'run' ? 2 : 1)) : null, maxCad: null, avgPace,

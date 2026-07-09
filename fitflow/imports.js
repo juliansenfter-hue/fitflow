@@ -120,6 +120,19 @@
       FF.recentImports = (acc && acc.demo) ? SEED_RECENT.slice() : [];
     },
 
+    /* drop all imports whose activity id starts with `prefix` (e.g. 'strava-'),
+       locally and in the cloud. Used before a full re-sync so an earlier, larger
+       import (e.g. the old 400) doesn't linger next to the fresh newest-N set. */
+    dropByPrefix(acc, prefix) {
+      const list = load(acc);
+      const drop = list.filter((e) => e && e.activity && String(e.activity.id).indexOf(prefix) === 0);
+      if (!drop.length) return 0;
+      const keep = list.filter((e) => !(e && e.activity && String(e.activity.id).indexOf(prefix) === 0));
+      saveList(acc, keep);
+      if (isCloud(acc)) { try { db().from(TABLE).delete().in('id', drop.map((e) => e.activity.id)); } catch (e) { /* noop */ } }
+      return drop.length;
+    },
+
     isCloud: isCloud,
     count(acc) { return load(acc).length; },
   };

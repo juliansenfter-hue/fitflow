@@ -1073,9 +1073,9 @@
           h('span', null, '·'), h('span', { className: 'mono' }, FF.fmt.dur(a.duration)),
           a.distance && h(Fragment, null, h('span', null, '·'), h('span', { className: 'mono' }, `${FF.fmt.n(a.distance, 1)} km`)))),
       h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4, flexShrink: 0 } },
-        h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss),
+        h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss != null ? a.tss : '–'),
         h('span', { className: 'label', style: { fontSize: 8.5 } }, 'TSS')),
-      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
+      a.rpe != null && h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
   }
 
   window.Screens = window.Screens || {};

@@ -119,6 +119,9 @@
       if (!r.connected) { saveStatus(acc, null); reflectStatus(acc); return { ok: false, connected: false }; }
 
       const list = Array.isArray(r.activities) ? r.activities : [];
+      // full (re)connect → replace the Strava set so a previous, larger import
+      // (e.g. the old 400) doesn't linger next to the fresh newest-N batch.
+      if (opts.full && window.FFImports && FFImports.dropByPrefix) FFImports.dropByPrefix(acc, 'strava-');
       let added = 0;
       list.forEach((s) => {
         if (!window.FF || !FF.buildActivityFromStrava || !window.FFImports) return;
@@ -133,7 +136,8 @@
       const st = {
         connected: true, athlete: r.athlete || prev.athlete || null,
         lastSync: Date.now(), lastSyncEpoch: Math.floor(Date.now() / 1000),
-        count: (prev.count || 0) + added,
+        // full sync replaced the set → count is just the fresh batch
+        count: opts.full ? added : ((prev.count || 0) + added),
       };
       saveStatus(acc, st);
       reflectStatus(acc);
