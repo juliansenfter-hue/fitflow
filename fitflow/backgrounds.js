@@ -477,6 +477,21 @@
       subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
     },
     reset() { this.set(Object.assign({}, DEFAULTS)); },
+    // temporär anwenden OHNE zu speichern — z. B. erzwungener Login-Hintergrund
+    // (Animation 4). Die gespeicherte Nutzer-Einstellung bleibt in localStorage.
+    apply(partial) {
+      S = Object.assign({}, S, partial);
+      if (!root) render(); else renderSoon();
+      subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
+    },
+    // gespeicherte Nutzer-Einstellung (oder Defaults) wiederherstellen — nach Login.
+    restore() {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+      S = Object.assign({}, DEFAULTS, saved || {});
+      if (!root) render(); else renderSoon();
+      subs.forEach((fn) => { try { fn(Object.assign({}, S)); } catch (e) {} });
+    },
     subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
   };
 

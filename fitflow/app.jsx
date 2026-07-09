@@ -456,6 +456,14 @@
         }
       });
     }, []);
+    // Am Anmeldefenster (nicht eingeloggt) läuft IMMER Animation 4 — die
+    // persönliche Design-Einstellung des Nutzers gilt erst nach dem Login.
+    useEffect(() => {
+      const B = window.FFBackground;
+      if (!B) return;
+      if (Auth && !authed) B.apply({ mode: 'video', video: 4 });
+      else B.restore();
+    }, [authed]);
     if (phase === 'loading') return h(BootSplash, { label: API && API.mode === 'live' ? 'Mit Backend verbinden …' : 'Daten werden geladen …' });
     if (phase === 'error') return h(BootError, { err, onRetry: run, onMock: () => { API.useMock(); run(); } });
     // wait for the first Supabase session check before deciding login vs app (kein Login-Flash)
