@@ -50,6 +50,11 @@
   }
   function isOnboarded(u) { return !!(u && u.user_metadata && u.user_metadata.onboarded); }
 
+  /* per-account "user chose to open the (still empty) dashboard" flag. Lets the
+     Erste-Schritte-Checkliste hand off to the real dashboard on demand, even
+     before any activities are imported (the dashboard then renders empty). */
+  function dashOpenKey(acc) { return 'ff-dashopen::' + String((acc && acc.email) || 'anon').toLowerCase(); }
+
   /* the clean app URL (no hash/query) — used as the redirect target for the
      reset/confirm e-mail links. Must be listed under Supabase → Auth → Redirect URLs. */
   function appUrl() { return location.href.split('#')[0].split('?')[0]; }
@@ -281,6 +286,7 @@
 
     /* mark the active account as onboarded → leaves the empty state */
     markOnboarded: function () {
+      if (testUser) { testUser.onboarded = true; emit(); return Promise.resolve({ ok: true }); }
       if (demo || !client || !user) return Promise.resolve({ ok: true });
       return client.auth.updateUser({ data: { onboarded: true } }).then(function (res) {
         if (!res.error) { user = res.data.user; emit(); }
@@ -288,11 +294,27 @@
       });
     },
 
+    /* the Erste-Schritte checklist's „Dashboard öffnen" → leave the empty state
+       and show the real dashboard, even without imported activities. Persists so
+       a reload keeps the dashboard open, and emits so Root re-renders. */
+    openDashboard: function () {
+      var acc = Auth.currentAccount();
+      try { localStorage.setItem(dashOpenKey(acc), '1'); } catch (e) { /* quota — ignore */ }
+      emit();
+      return Promise.resolve({ ok: true });
+    },
+    isDashboardOpen: function (acc) {
+      acc = acc || Auth.currentAccount();
+      if (!acc || acc.demo) return false;
+      try { return !!localStorage.getItem(dashOpenKey(acc)); } catch (e) { return false; }
+    },
+
     /* lokaler Test: frisches, leeres Konto simulieren → Onboarding + Video + leeres Dashboard,
        ganz ohne echte E-Mail / Supabase. */
     loginTest: function () {
       demo = false; user = null; recovery = false;
       testUser = { name: 'Test-Konto', email: 'test@fitflow.local', onboarded: false, meta: {} };
+      try { localStorage.removeItem(dashOpenKey(testUser)); } catch (e) { /* noop */ }
       emit();
       return Promise.resolve({ ok: true, registered: true, empty: true, test: true });
     },

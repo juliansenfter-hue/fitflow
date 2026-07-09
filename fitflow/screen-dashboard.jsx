@@ -119,8 +119,22 @@
   }
 
   /* ---------- Belastungsrisiko (ACWR) — full-width gauge under the vitals ---------- */
-  function RiskBar({ risk }) {
-    const b = risk.band, col = `var(--${b.status})`;
+  /* compact in-card empty state — used across the dashboard when a fresh account
+     has no imported activities yet, so demo numbers never leak through. */
+  function CardEmpty({ icon = 'spark', title, hint, onNav, ctaRoute, cta }) {
+    return h('div', { className: 'col center gap-10', style: { padding: '34px 18px', textAlign: 'center', flex: 1, justifyContent: 'center', minHeight: 130 } },
+      h('span', { style: { width: 46, height: 46, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-3)' } }, h(Icon, { name: icon, size: 21 })),
+      h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 700 } }, title),
+      hint && h('span', { style: { fontSize: 12.5, color: 'var(--text-3)', maxWidth: 320, lineHeight: 1.5 } }, hint),
+      cta && onNav && h('button', { className: 'btn btn--sm btn--outline', onClick: () => onNav(ctaRoute) }, cta, h(Icon, { name: 'chevR', size: 13 })));
+  }
+
+  function RiskBar({ risk, noData }) {
+    // band is null until there's enough load history (fresh/empty account) —
+    // fall back to a neutral „no data yet" state instead of crashing.
+    const b = noData ? { status: 'text-4', label: 'Noch keine Daten' }
+      : (risk.band || { status: 'text-4', label: 'Noch keine Daten' });
+    const col = `var(--${b.status})`;
     const lo = risk.gaugeLo, hi = risk.gaugeHi, span = hi - lo;
     const pos = Math.max(0, Math.min(1, (risk.acwr - lo) / span));
     const zones = [{ to: 0.8, c: 'info' }, { to: 1.3, c: 'good' }, { to: 1.5, c: 'warn' }, { to: hi, c: 'bad' }];
@@ -136,9 +150,9 @@
       h('div', { className: 'row center gap-18' },
         h('div', { className: 'col', style: { gap: 2, flexShrink: 0 } },
           h('div', { className: 'row', style: { alignItems: 'baseline', gap: 5 } },
-            h('span', { className: 'metric', style: { fontSize: 34, lineHeight: .9, color: col } }, fmt.n(risk.acwr, 2).replace('.', ',')),
+            h('span', { className: 'metric', style: { fontSize: 34, lineHeight: .9, color: col } }, noData ? '–' : fmt.n(risk.acwr, 2).replace('.', ',')),
             h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--text-4)' } }, 'ACWR')),
-          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-4)' } }, `Akut ${risk.acute} · Chron. ${risk.chronic}`)),
+          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-4)' } }, noData ? 'Noch keine Belastungsdaten' : `Akut ${risk.acute} · Chron. ${risk.chronic}`)),
         h('div', { style: { flex: 1, minWidth: 0 } },
           h('div', { className: 'ff-risk-gauge' },
             zones.map((z, i) => { const w = (z.to - prev) / span * 100; prev = z.to; return h('span', { key: i, className: 'ff-risk-zone', style: { width: w + '%', background: `color-mix(in srgb, var(--${z.c}) 44%, transparent)` } }); }),
@@ -189,8 +203,15 @@
         h('div', { className: 'ff-fokus-fill', style: { width: `${w}%`, '--fc': `var(--${b.zone})` } })));
   }
 
-  function TrainingsfokusCard() {
+  function TrainingsfokusCard({ noData, onNav }) {
     const [range, setRange] = useState('7d');
+    if (noData) {
+      return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
+          info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.' },
+        h(CardEmpty, { icon: 'flame', title: 'Noch kein Trainingsfokus',
+          hint: 'Sobald du Aktivitäten importierst, zeigt sich hier deine Intensitätsverteilung.',
+          onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }));
+    }
     const r = FOKUS_RANGES.find((x) => x.key === range);
     const total = r.data.low + r.data.mid + r.data.high;
     const pct = {
@@ -343,12 +364,15 @@
     return isNaN(num) ? d.hist : d.hist.slice(0, -1).concat(num);
   }
 
-  function Vital({ id, icon, label, value, unit, base, status, spark, sparkColor, glow, pulse, pulseColor, onClick, active, valueSize = 56, manualHint }) {
+  function Vital({ id, icon, label, value, unit, base, status, spark, sparkColor, glow, pulse, pulseColor, onClick, active, valueSize = 56, manualHint, noData }) {
     const stCol = status === 'good' ? 'var(--good)' : status === 'warn' ? 'var(--warn)' : 'var(--bad)';
     const [manual, setManual] = useState(() => (id ? (loadManualVitals()[id] || null) : null));
     const [draft, setDraft] = useState('');
     const hasManual = manual != null && manual !== '';
-    const displayValue = hasManual ? manual : value;
+    // fresh account with no data yet: show a dash + manual-entry field, never the
+    // demo value/baseline/history (those belong to the sample dataset only).
+    const showData = hasManual || !noData;
+    const displayValue = hasManual ? manual : (noData ? '–' : value);
     /* manueller Wert erscheint als neuester Punkt im Verlauf */
     let displaySpark = spark;
     if (hasManual && Array.isArray(spark)) {
@@ -380,9 +404,9 @@
           h('div', { className: 'row', style: { alignItems: 'baseline', gap: 5, minWidth: 0 } },
             h('span', { className: 'metric', style: { fontSize: valueSize, lineHeight: .9, letterSpacing: '-.02em' } }, displayValue),
             h('span', { className: 'unit' }, unit)),
-          base && h('div', { className: 'row center', style: { minHeight: 22 } }, base)),
+          base && showData && h('div', { className: 'row center', style: { minHeight: 22 } }, base)),
         /* full-width sparkline */
-        spark && h('div', { style: { marginTop: 10, width: '100%' } },
+        spark && showData && h('div', { style: { marginTop: 10, width: '100%' } },
           h(C.Sparkline, { data: displaySpark, w: 260, hgt: 40, color: sparkColor || 'accent', fill: true, responsive: true })),
         /* manuelles Eingabefeld — überschreibt Wert bis Mitternacht */
         id && h('div', { className: 'ff-vital-manual', onClick: stop, onMouseDown: stop, onPointerDown: stop },
@@ -417,7 +441,7 @@
   }
 
   /* ---- Form & Fitness: scrub the chart to read values at the cursor ---- */
-  function FormFitnessCard({ onNav, allowSim }) {
+  function FormFitnessCard({ onNav, allowSim, noData }) {
     const tl = FF.todayLoad;
     const [mode, setMode] = useState('history');
     const m = allowSim ? mode : 'history';
@@ -446,6 +470,12 @@
         h('span', { className: 'metric', style: { fontSize: size || (big ? 44 : 34), fontWeight: 800, lineHeight: .95, letterSpacing: '-.02em', color: color ? `var(--${color})` : 'var(--text)', transition: 'color .2s var(--ease), font-size .2s var(--ease)' } }, value)),
       h('div', { style: { fontSize: 12, height: 22, display: 'flex', alignItems: 'center', gap: 6 } }, sub));
 
+    if (noData) {
+      return h(Card, { title: 'Belastungsverh\u00e4ltnis', icon: 'diag', info: 'ATL (7\u2009Tage) vs. CTL (42\u2009Tage) ergeben die Trainingsstressbalance (TSB).' },
+        h(CardEmpty, { icon: 'diag', title: 'Noch keine Form-Daten',
+          hint: 'Fitness (CTL), Fatigue (ATL) und Form (TSB) berechnen sich aus deinen Aktivit\u00e4ten.',
+          onNav, ctaRoute: 'import', cta: 'Aktivit\u00e4ten importieren' }));
+    }
     return h(Card, { title: 'Belastungsverh\u00e4ltnis', icon: 'diag', info: 'ATL (7\u2009Tage) vs. CTL (42\u2009Tage) ergeben die Trainingsstressbalance (TSB).',
         right: h('div', { className: 'row center gap-12' },
           allowSim && h(ModeSeg, { value: m, onChange: setMode }),
@@ -493,10 +523,16 @@
             : 'Auf den Verlauf klicken, um bis zu 3 Tage zu vergleichen')));
   }
 
-  function WochenrhythmusCard() {
+  function WochenrhythmusCard({ noData, onNav }) {
     const fmt = FF.fmt;
     const [hoverDay, setHoverDay] = useState(null);
     const [pins, setPins] = useState([]); // weekday indices, placement order, max 3
+    if (noData) {
+      return h(Card, { title: 'Wochenrhythmus', icon: 'activity', className: 'ff-hero-card' },
+        h(CardEmpty, { icon: 'activity', title: 'Noch kein Wochenrhythmus',
+          hint: 'Dein wöchentliches Belastungsmuster erscheint hier, sobald Aktivitäten vorliegen.',
+          onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }));
+    }
     const addPin = (i) => { if (i == null) return; setPins((p) => p.includes(i) ? p : (p.length >= 3 ? [...p.slice(1), i] : [...p, i])); };
     const removePin = (i) => setPins((p) => p.filter((x) => x !== i));
     const rhythm = [3.2, 9.6, 4.8, 9.2, 3.0, 8.4, 6.1];
@@ -640,7 +676,10 @@
                 h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
                   h('span', { className: 'strong', style: { fontSize: 15, fontWeight: 700 } }, 'Alles startklar!'),
                   h('span', { style: { fontSize: 12.5, color: 'var(--text-2)' } }, 'Dein vollständiges Dashboard steht bereit.')),
-                h('button', { className: 'btn btn--primary', onClick: () => { window.FFAuth && window.FFAuth.markOnboarded(); onOnboarded && onOnboarded(); } },
+                h('button', { className: 'btn btn--primary', onClick: () => {
+                    if (window.FFAuth) { window.FFAuth.markOnboarded(); window.FFAuth.openDashboard(); }
+                    onOnboarded && onOnboarded();
+                  } },
                   'Dashboard öffnen', h(Icon, { name: 'chevR', size: 15 })))
             : h('p', { className: 'ff-ob-hint' }, h(Icon, { name: 'info', size: 14 }),
                 h('span', null, 'Sobald alle Schritte erledigt sind, öffnet sich dein persönliches Dashboard automatisch.')))));
@@ -665,48 +704,56 @@
       { zone: 'z3', value: w.intensity.z3, label: 'Z3' }, { zone: 'z4', value: w.intensity.z4, label: 'Z4' },
       { zone: 'z5', value: w.intensity.z5, label: 'Z5' },
     ];
+    // fresh account with no imported activities → render clean empty states
+    // everywhere instead of the seeded demo values (recovery / vitals / focus).
+    const noData = !FF.activities.length;
 
     return h('div', { className: 'ff-grid', style: { gap: 18 } },
       /* ---------- HERO ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18, alignItems: 'stretch' }, 'data-hero': true },
         /* Left column: recommendation + Belastungsbalance + Trainingsfokus below it */
         h('div', { className: 'col', style: { gap: 18 } },
-          h(EmpfehlungContent, { rec, reco, view: heroView, setView: setHeroView, checkin, setCheckin, showCheckin: mods.checkin }),
-          mods.risk && h(RiskBar, { risk: FF.risk }),
-          h(TrainingsfokusCard, null)),
+          noData
+            ? h(Card, { title: 'Heutige Empfehlung', icon: 'spark' },
+                h(CardEmpty, { icon: 'spark', title: 'Noch keine Empfehlung',
+                  hint: 'Sobald Aktivitäten und Erholungsdaten vorliegen, erscheint hier deine tägliche Trainingsempfehlung.',
+                  onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }))
+            : h(EmpfehlungContent, { rec, reco, view: heroView, setView: setHeroView, checkin, setCheckin, showCheckin: mods.checkin }),
+          mods.risk && h(RiskBar, { risk: FF.risk, noData }),
+          h(TrainingsfokusCard, { noData, onNav })),
         /* Vitals 3x2 — Zeilen strecken sich über die volle Spaltenhöhe */
         h('div', { className: 'col', style: { gap: 18, height: '100%' } },
         h('div', { className: 'ff-grid grid-2', style: { gap: 18, gridTemplateRows: 'repeat(3, 1fr)', flex: 1, minHeight: 0 } },
-          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)',
+          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)', noData,
             onClick: () => setHeroView((v) => (v === 'hrv' ? 'reco' : 'hrv')), active: heroView === 'hrv',
             base: h(Delta, { value: rec.hrv.val - rec.hrv.base, unit: ' ms', suffix: ' Baseline' }),
             spark: VITAL_DATA.hrv.hist, sparkColor: VITAL_DATA.hrv.color, manualHint: 'z. B. 68' }),
-          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)',
+          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)', noData,
             onClick: () => setHeroView((v) => (v === 'sleep' ? 'reco' : 'sleep')), active: heroView === 'sleep',
             base: h(Delta, { value: +(rec.sleep.val - 8).toFixed(1), unit: ' h', suffix: ' vs. Ziel' }),
             spark: VITAL_DATA.sleep.hist, sparkColor: VITAL_DATA.sleep.color, manualHint: 'z. B. 7,4' }),
-          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)',
+          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)', noData,
             onClick: () => setHeroView((v) => (v === 'rhr' ? 'reco' : 'rhr')), active: heroView === 'rhr',
             base: h(Delta, { value: rec.rhr.val - rec.rhr.base, unit: ' bpm', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.rhr.hist, sparkColor: VITAL_DATA.rhr.color, manualHint: 'z. B. 49' }),
-          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)',
+          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)', noData,
             onClick: () => setHeroView((v) => (v === 'resp' ? 'reco' : 'resp')), active: heroView === 'resp',
             base: h(Delta, { value: 14 - 15, unit: ' /min', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.resp.hist, sparkColor: VITAL_DATA.resp.color, manualHint: 'z. B. 14' }),
-          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)',
+          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)', noData,
             onClick: () => setHeroView((v) => (v === 'spo2' ? 'reco' : 'spo2')), active: heroView === 'spo2',
             base: h(Delta, { value: 98 - 97, unit: ' %', suffix: ' Baseline' }),
             spark: VITAL_DATA.spo2.hist, sparkColor: VITAL_DATA.spo2.color, manualHint: 'z. B. 98' }),
-          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)',
+          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)', noData,
             onClick: () => setHeroView((v) => (v === 'bp' ? 'reco' : 'bp')), active: heroView === 'bp',
             base: h(Delta, { value: 118 - 120, unit: ' mmHg', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.bp.hist, sparkColor: VITAL_DATA.bp.color, manualHint: 'z. B. 118/76' })))),
 
       /* ---------- FORM / FITNESS ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
-        h(FormFitnessCard, { onNav, allowSim: mods.sim }),
+        h(FormFitnessCard, { onNav, allowSim: mods.sim, noData }),
         /* Weekly rhythm */
-        h(WochenrhythmusCard, null)),
+        h(WochenrhythmusCard, { noData, onNav })),
 
       /* ---------- WEEKLY GOALS + ACTIVITIES ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
@@ -729,7 +776,12 @@
         h(Card, { title: 'Letzte Einheiten', icon: 'activity', pad: false,
           right: h('button', { className: 'btn btn--sm btn--ghost', onClick: () => onNav('diag') }, 'Alle') },
           h('div', { className: 'col', style: { padding: '4px 10px 10px' } },
-            FF.activities.slice(0, 5).map((a) => h(ActivityRow, { key: a.id, a, onClick: () => onOpenActivity(a.id) }))))));
+            FF.activities.length
+              ? FF.activities.slice(0, 5).map((a) => h(ActivityRow, { key: a.id, a, onClick: () => onOpenActivity(a.id) }))
+              : h('div', { className: 'col center gap-8', style: { padding: '28px 10px', textAlign: 'center', color: 'var(--text-3)' } },
+                  h(Icon, { name: 'activity', size: 22 }),
+                  h('span', { style: { fontSize: 13 } }, 'Noch keine Aktivitäten'),
+                  h('button', { className: 'btn btn--sm btn--outline', onClick: () => onNav('import') }, 'Aktivitäten importieren', h(Icon, { name: 'chevR', size: 13 })))))));
   }
 
   function LoadBar({ band, lo, hi, fillTo = 73, height = 100, colors = ['var(--z3)', 'var(--z4)', 'var(--z5)'] }) {

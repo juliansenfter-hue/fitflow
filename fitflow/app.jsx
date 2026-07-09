@@ -176,6 +176,25 @@
       h(Icon, { name: 'layers', size: 30 }), h('div', { style: { marginTop: 12 } }, `${name} – in Arbeit`));
   }
 
+  /* Catches render errors in a screen so one bad widget (e.g. a metric fed
+     sparse/empty data) shows a recoverable message instead of blanking the
+     whole app to a black screen. Keyed by route → remounts (clears) on nav. */
+  class ScreenBoundary extends React.Component {
+    constructor(props) { super(props); this.state = { error: null }; }
+    static getDerivedStateFromError(error) { return { error: error }; }
+    componentDidCatch(error, info) { try { console.error('[FitFlow] Ansicht-Fehler:', error, info); } catch (e) { /* noop */ } }
+    render() {
+      if (this.state.error) {
+        return h('div', { className: 'panel', style: { margin: 24, padding: 28, textAlign: 'center' } },
+          h('h2', { className: 'h2', style: { marginBottom: 8 } }, 'Diese Ansicht konnte nicht geladen werden'),
+          h('p', { style: { color: 'var(--text-3)', fontSize: 13, marginBottom: 18 } },
+            'Ein unerwarteter Fehler ist aufgetreten. Bitte lade die Seite neu.'),
+          h('button', { className: 'btn btn--primary', onClick: () => location.reload() }, 'Neu laden'));
+      }
+      return this.props.children;
+    }
+  }
+
   function App({ locked, startTour, onTourDone }) {
     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
     const [route, setRoute] = useState(() => location.hash.replace('#', '') || 'dashboard');
@@ -279,7 +298,7 @@
       h(TopbarActions, { onNav: nav, onOpenActivity: openActivity }));
 
     return h(Fragment, null,
-      h(Shell, { current: route, onNav: nav, topbar }, screen),
+      h(Shell, { current: route, onNav: nav, topbar }, h(ScreenBoundary, { key: route }, screen)),
       intro && h(IntroSplash, { onDone: () => setIntro(false) }),
       tour === 'ask' && h(TourPrompt, { onStart: () => setTour('run'), onLater: endTour }),
       tour === 'run' && window.OnboardingTour && h(window.OnboardingTour, { onNav: nav, onFinish: endTour }),
@@ -466,7 +485,10 @@
     // vollständig aus den eigenen Importen berechnet werden (FFMetrics).
     const acc = Auth ? Auth.currentAccount() : null;
     const hasData = !!(acc && !acc.demo && acc.email && window.FFImports && FFImports.count(acc) > 0);
-    const isEmpty = acc ? (!acc.demo && !hasData) : false;
+    // the user can also open the dashboard manually from the Erste-Schritte
+    // checklist (even with no data yet — it then renders empty, never demo).
+    const openedManually = !!(Auth && Auth.isDashboardOpen && Auth.isDashboardOpen(acc));
+    const isEmpty = acc ? (!acc.demo && !hasData && !openedManually) : false;
     if (Acct) Acct.apply(isEmpty, acc);
     return h(App, { key: acc ? acc.email : 'live' });
   }
