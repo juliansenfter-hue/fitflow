@@ -220,22 +220,34 @@ body::after{
 }
 .unit{font-size:.5em;font-weight:500;color:var(--text-3);letter-spacing:0}
 
-/* ---- panel / card — Apple dark material ---- */
+/* ---- panel / card — Liquid Glass (immersive Apple material) ----
+   Thin, clear fill so the backdrop shines through; a real specular rim
+   on all four edges (light from above: bright top, soft secondary
+   reflection along the bottom, as refraction would produce); a diagonal
+   gloss streak across the surface. liquid-glass.js additionally keeps
+   edge refraction + chromatic aberration always on for every glass box. */
 .panel{
   background:
-    linear-gradient(180deg, var(--glass-sheen), rgba(255,255,255,0) 22%),
-    rgba(var(--lg-tint), var(--lg-opacity));
+    linear-gradient(180deg, rgba(255,255,255,calc(var(--lg-sheen) * .10)), rgba(255,255,255,calc(var(--lg-sheen) * .02)) 26%, rgba(255,255,255,0) 44%),
+    linear-gradient(115deg, rgba(255,255,255,calc(var(--lg-sheen) * .07)) 0%, rgba(255,255,255,calc(var(--lg-sheen) * .015)) 22%, rgba(255,255,255,0) 40%),
+    radial-gradient(140% 90% at 50% 118%, rgba(255,255,255,calc(var(--lg-sheen) * .055)), rgba(255,255,255,0) 55%),
+    rgba(var(--lg-tint), calc(var(--lg-opacity) * .5));
   -webkit-backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
   backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
-  border:1px solid var(--glass-edge);
+  border:1px solid rgba(255,255,255,calc(.05 + var(--lg-sheen) * .12));
   border-radius:var(--lg-radius);
   position:relative;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.14),
-    inset 1px 0 0 rgba(255,255,255,.10),
-    0 24px 60px -36px rgba(0,0,0,.8);
+    inset 0 1.5px 0 rgba(255,255,255,calc(.06 + var(--lg-sheen) * .24)),
+    inset 1.5px 0 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .09)),
+    inset -1.5px 0 0 rgba(255,255,255,calc(.02 + var(--lg-sheen) * .06)),
+    inset 0 -1.5px 0 rgba(255,255,255,calc(.04 + var(--lg-sheen) * .12)),
+    inset 0 26px 48px -30px rgba(255,255,255,calc(var(--lg-sheen) * .09)),
+    inset 0 -36px 46px -40px rgba(124,92,255,calc(var(--lg-sheen) * .10)),
+    0 32px 80px -40px rgba(0,0,0,.85);
 }
 .panel>*{position:relative;z-index:1}
+
 .panel--flush{padding:0}
 .panel-pad{padding:22px 24px}
 .ff-hero-card{display:flex;flex-direction:column}
@@ -266,32 +278,47 @@ body::after{
 .btn--primary{background:var(--accent);color:var(--accent-ink)}
 .btn--primary:hover{background:var(--accent-bright)}
 
-/* glass icon buttons (topbar) — circular material buttons */
+/* glass icon buttons (topbar) — perfect circles, hairline edge, quiet */
 .ff-glass-icon{
-  color:var(--text);border-radius:11px !important;
+  color:var(--text-2);border-radius:999px !important;
   background:var(--panel-2) !important;
   -webkit-backdrop-filter:var(--glass-blur-lo);
   backdrop-filter:var(--glass-blur-lo);
-  border:1px solid transparent !important;
-  transition:background .25s var(--ease),transform .18s var(--ease);
+  border:1px solid var(--line) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  transition:background .25s var(--ease),border-color .25s var(--ease),
+    color .25s var(--ease),transform .18s var(--ease);
 }
-.ff-glass-icon:hover{background:var(--panel-3) !important}
-.ff-glass-icon svg{color:var(--text)}
+.ff-glass-icon:hover{
+  background:var(--panel-3) !important;
+  border-color:var(--line-2) !important;
+  color:var(--text);
+}
+.ff-glass-icon:active{transform:scale(.94)}
+.ff-glass-icon svg{color:inherit}
+.ff-glass-icon:focus-visible,.ff-liquid-btn:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
 
-/* primary CTA in the topbar — solid accent pill, calm */
+/* primary CTA in the topbar — filled accent pill, sentence case (Apple) */
 .ff-liquid-btn{
   position:relative;isolation:isolate;
-  color:#fff;border-radius:11px !important;letter-spacing:.04em;height:42px;padding:0 20px;
-  background:rgba(44,44,48,.66) !important;
-  -webkit-backdrop-filter:var(--glass-blur-lo);backdrop-filter:var(--glass-blur-lo);
-  border:1px solid var(--line-2) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 30px -22px rgba(0,0,0,.8);
-  transition:background-color .25s var(--ease),box-shadow .25s var(--ease),transform .18s var(--ease);
+  color:#fff;border-radius:999px !important;height:42px;padding:0 21px;
+  font-size:13px;font-weight:600;letter-spacing:-.01em;text-transform:none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 55%),
+    var(--accent) !important;
+  border:1px solid transparent !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 1px 2px rgba(0,0,0,.35),
+    0 10px 26px -12px var(--accent-glow);
+  transition:background-color .25s var(--ease),box-shadow .25s var(--ease),
+    transform .18s var(--ease),filter .25s var(--ease);
 }
-.ff-liquid-btn:hover{
-  background:rgba(60,60,66,.74) !important;
-}
-.ff-liquid-btn:active{transform:scale(.97)}
+.ff-liquid-btn svg{width:15px;height:15px}
+.ff-liquid-btn:hover{filter:brightness(1.12)}
+.ff-liquid-btn:active{transform:scale(.97);filter:brightness(.96)}
 .btn--ghost{background:var(--panel-2);border-color:transparent;color:var(--text)}
 .btn--ghost:hover{background:var(--panel-3)}
 .btn--outline{border-color:var(--line-2);color:var(--text)}
@@ -388,6 +415,12 @@ body::after{
 .ff-logo-mark svg{display:block;overflow:visible}
 @keyframes ff-logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.ff-logo-mark{animation:none}}
+/* Bild-Logo im Brand-Slot (Sidebar + Intro) */
+.ff-brandlogo{width:158px;height:auto;display:block;user-select:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 10px 26px var(--accent-glow)) drop-shadow(0 2px 6px rgba(0,0,0,.45));
+  animation:ff-logo-float 7s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.ff-brandlogo{animation:none}}
+.ff-intro-logo .ff-brandlogo{width:min(340px,60vw);animation:none}
 .ff-wordmark{font-family:var(--font-sans);font-size:31px;font-weight:800;letter-spacing:-.01em;
   line-height:1;text-transform:uppercase;
   background:linear-gradient(115deg,var(--text) 38%,var(--accent-bright));
@@ -545,19 +578,29 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 .grid-3{grid-template-columns:repeat(3,1fr)}
 .grid-4{grid-template-columns:repeat(4,1fr)}
 
-/* metric tile — inner material (like widget cells) */
+/* metric tile — inner material (like widget cells), Liquid Glass scaled
+   down: same specular rim + top sheen as .panel, gentler so the small
+   cells don't outshine their parent card */
 .tile{
-  background:rgba(var(--lg-tint2), var(--lg-opacity-tile));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,calc(var(--lg-sheen) * .09)), rgba(255,255,255,calc(var(--lg-sheen) * .015)) 30%, rgba(255,255,255,0) 52%),
+    rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) * .6));
   -webkit-backdrop-filter:blur(var(--lg-blur-tile)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
   backdrop-filter:blur(var(--lg-blur-tile)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
-  border:1px solid var(--glass-edge-2);border-radius:var(--lg-radius-tile);padding:18px 20px;
+  border:1px solid rgba(255,255,255,calc(.04 + var(--lg-sheen) * .10));border-radius:var(--lg-radius-tile);padding:18px 20px;
   display:flex;flex-direction:column;gap:10px;min-width:0;position:relative;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 1px 0 0 rgba(255,255,255,.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,calc(.05 + var(--lg-sheen) * .21)),
+    inset 1px 0 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .07)),
+    inset -1px 0 0 rgba(255,255,255,calc(.02 + var(--lg-sheen) * .05)),
+    inset 0 -1px 0 rgba(255,255,255,calc(.03 + var(--lg-sheen) * .10));
 }
 .tile>*{position:relative;z-index:1}
 .tile--clickable{cursor:pointer;transition:background .25s var(--ease),border-color .25s var(--ease),transform .25s var(--ease)}
-.tile--clickable:hover{background:rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) + .08));
-  border-color:var(--glass-edge);transform:translateY(-1px)}
+.tile--clickable:hover{background:
+    linear-gradient(180deg, rgba(255,255,255,calc(.02 + var(--lg-sheen) * .11)), rgba(255,255,255,calc(var(--lg-sheen) * .02)) 30%, rgba(255,255,255,0) 52%),
+    rgba(var(--lg-tint2), calc(var(--lg-opacity-tile) * .6 + .08));
+  border-color:rgba(255,255,255,.2);transform:translateY(-1px)}
 .tile--clickable:active{transform:scale(.99)}
 .tile--clickable .tile-expand{transition:color .25s var(--ease),transform .25s var(--ease)}
 .tile--clickable:hover .tile-expand{color:var(--text)!important;transform:translate(1px,-1px)}
@@ -571,10 +614,10 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
    card lights from its near edge and ramps up on approach.
    ============================================================ */
 .panel,.tile,.ff-topbar{position:relative;--lx:-9999px;--ly:-9999px;
-  /* default (un-named) cards: white light, kept gentle */
+  /* default (un-named) cards: white light — liquid glass catches it a bit harder */
   --glow-color:#ffffff;
-  --glow-rim:.40;   /* edge-light strength */
-  --glow-fill:.045; /* faint inner wash */
+  --glow-rim:.55;   /* edge-light strength */
+  --glow-fill:.06;  /* faint inner wash */
 }
 /* named cards (.spotlight) light up in their own colour, more intensely */
 .spotlight{--glow-color:var(--accent);--glow-rim:1;--glow-fill:.13}
@@ -850,6 +893,12 @@ body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 .ff-ck-opt.on[data-tone=good]{background:color-mix(in srgb,var(--good) 82%,#000);color:#fff}
 .ff-ck-opt.on[data-tone=mid]{background:rgba(255,255,255,.18);color:var(--text)}
 .ff-ck-opt.on[data-tone=bad]{background:color-mix(in srgb,var(--bad) 82%,#000);color:#fff}
+.ff-ck-note{width:100%;box-sizing:border-box;resize:vertical;min-height:52px;
+  font-family:var(--font-sans);font-size:12.5px;line-height:1.45;letter-spacing:-.01em;
+  color:var(--text);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:10px;padding:9px 12px;transition:border-color .2s var(--ease),background .2s var(--ease)}
+.ff-ck-note::placeholder{color:var(--text-4)}
+.ff-ck-note:focus{outline:none;border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:rgba(255,255,255,.07)}
 .ff-ck-done{width:22px;height:22px;border-radius:99px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;color:#fff;
   background:color-mix(in srgb,var(--good) 80%,#000)}
@@ -945,6 +994,13 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
    KONTO — inline editors, rows, toast, confirm, danger
    ============================================================ */
 .ff-acct-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+/* einheitliche Einstellungs-Zeile (Konto- & Einstellungen-Kästchen):
+   Label/Wert links, ein Bedienelement rechts, Haarlinie darüber */
+.ff-setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 0;border:0;border-top:1px solid var(--line-soft)}
+.ff-setrow:first-child{border-top:0;padding-top:2px}
+.ff-setrow--stack{display:block}
+button.ff-setrow{width:100%;background:none;cursor:pointer;text-align:left;font-family:inherit}
 .ff-acct-edit{padding:14px;border-radius:var(--r-md,12px);background:var(--panel-2);border:1px solid var(--line)}
 .ff-acct-toast{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;color:var(--good);
   padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--good) 13%,transparent);
@@ -982,6 +1038,7 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
 .ff-login-mark{width:38px;height:38px;flex-shrink:0}
 .ff-login-mark .ff-logo-mark{width:38px;height:38px}
 .ff-login-word{font-family:var(--font-display,inherit);font-weight:700;font-size:34px;letter-spacing:-.025em;color:#fff;line-height:1}
+.ff-login-logo{display:block;height:54px;width:auto;object-fit:contain;user-select:none}
 .ff-login-title{font-size:23px;font-weight:700;letter-spacing:-.02em;color:#fff;margin:0 0 5px;text-align:center}
 .ff-login-sub{font-size:13px;color:var(--text-3);line-height:1.45;margin:0 0 22px;text-align:center}
 
@@ -1037,7 +1094,8 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
   transition:background .2s var(--ease),border-color .2s var(--ease)}
 .ff-login-soc:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.2)}
-.ff-login-demo{margin-top:14px;text-align:center;font-size:12.5px}
+.ff-login-demo{margin-top:14px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;font-size:12.5px}
+.ff-login-demo-sep{color:var(--text-4)}
 .ff-login-foot{margin-top:20px;text-align:center;font-size:12.5px;color:var(--text-3)}
 
 @media (max-width:480px){
@@ -1100,10 +1158,43 @@ html.is-touch .ff-content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-s
 .ff-onb-back:hover,.ff-onb-skip:hover,.ff-onb-skipall:hover{color:var(--text)}
 .ff-onb-skipall{color:var(--text-4)}
 
+/* Willkommens-Video nach dem Onboarding — Vollbild, deckt alles ab */
+.ff-onb--video{padding:0;background:#000}
+.ff-onb-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+
+/* Welcome-Screen nach dem Video — Logo groß, „Willkommen", Button zentriert */
+.ff-welcome{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(24px,4.5vh,46px);padding:48px 24px;text-align:center;
+  background:radial-gradient(1200px 700px at 50% 28%, color-mix(in srgb,var(--accent) 20%,transparent), transparent 62%),
+    radial-gradient(900px 620px at 50% 118%, color-mix(in srgb,var(--accent) 10%,transparent), transparent 60%),
+    #05060a;
+  animation:ffWelcomeIn .7s var(--ease) both}
+@keyframes ffWelcomeIn{from{opacity:0}to{opacity:1}}
+.ff-welcome-logo{width:min(440px,64vw);height:auto;display:block;user-select:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 24px 70px var(--accent-glow)) drop-shadow(0 6px 18px rgba(0,0,0,.5));
+  animation:ffWelcomeLogo 1s var(--ease) both}
+@keyframes ffWelcomeLogo{from{opacity:0;transform:translateY(22px) scale(.92)}to{opacity:1;transform:none}}
+.ff-welcome-title{margin:0;font-family:var(--font-sans);font-weight:800;letter-spacing:-.02em;line-height:1;
+  font-size:clamp(40px,8vw,84px);text-wrap:balance;
+  background:linear-gradient(108deg,#fff 30%,var(--accent-bright) 78%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:ffWelcomeItem .8s var(--ease) .12s both}
+.ff-welcome-go{display:inline-flex;align-items:center;gap:11px;height:66px;padding:0 40px;border:0;border-radius:18px;
+  cursor:pointer;font-family:var(--font-sans);font-size:19px;font-weight:700;letter-spacing:-.01em;color:var(--accent-ink);
+  background:var(--accent);box-shadow:0 18px 50px -14px var(--accent-glow),0 5px 16px rgba(0,0,0,.45);
+  transition:background .2s var(--ease),transform .15s var(--ease),opacity .2s;
+  animation:ffWelcomeItem .8s var(--ease) .24s both}
+.ff-welcome-go:hover{background:var(--accent-bright)}
+.ff-welcome-go:active{transform:scale(.97)}
+.ff-welcome-go:disabled{opacity:.55;cursor:default}
+@keyframes ffWelcomeItem{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ff-welcome,.ff-welcome-logo,.ff-welcome-title,.ff-welcome-go{animation:none}}
+
 /* ============================================================
    EMPTY ACCOUNT — onboarding checklist + empty screens
    ============================================================ */
-.ff-ob-wrap{max-width:760px;margin:0 auto}
+.ff-ob-wrap{max-width:1180px;margin:0 auto}
+.ff-ob-card>.panel-pad{padding:34px 40px}
 .ff-ob-card{position:relative;overflow:hidden}
 .ff-ob-card::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(120% 70% at 100% 0,var(--accent-soft),transparent 58%)}
@@ -1371,92 +1462,88 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .ff-range::-moz-range-thumb{width:20px;height:20px;border-radius:99px;background:#fff;border:0;
   box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer}
 
-/* ---- liquid-glass sliders (Design tab) ---- */
+/* ---- liquid-glass sliders (Design tab) — iOS style ---- */
 .ff-gs-stack{display:flex;flex-direction:column}
-.ff-gs{padding:17px 0;border-bottom:1px solid var(--line-soft);position:relative;z-index:0}
+.ff-gs{padding:14px 0;border-bottom:1px solid var(--line-soft);position:relative;z-index:0}
 .ff-gs:first-child{padding-top:4px}
 .ff-gs:last-child{border-bottom:0;padding-bottom:4px}
-.ff-gs-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;gap:12px;position:relative;z-index:2}
-.ff-gs-label{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
-.ff-gs-val{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--accent-bright);
-  font-variant-numeric:tabular-nums;line-height:1;padding:5px 9px;border-radius:8px;
-  background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent-bright) 22%,transparent);
-  transition:color .2s var(--ease),background .2s var(--ease),border-color .2s var(--ease)}
-.ff-gs.is-drag .ff-gs-val{color:#fff;background:var(--accent);border-color:transparent}
+.ff-gs-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:12px}
+.ff-gs-label{font-size:13.5px;font-weight:500;letter-spacing:-.01em;color:var(--text)}
+.ff-gs-val{font-size:13px;color:var(--text-3);font-variant-numeric:tabular-nums;line-height:1;
+  transition:color .2s var(--ease)}
+.ff-gs.is-drag .ff-gs-val{color:var(--text)}
 
-.ff-gs-track{position:relative;z-index:1;height:6px;border-radius:99px;cursor:pointer;touch-action:none;
-  background:rgba(255,255,255,.09);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
-.ff-gs-fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;
-  background:linear-gradient(90deg,var(--accent),var(--accent-bright));
-  box-shadow:0 0 12px -2px var(--accent-glow);
+.ff-gs-track{position:relative;z-index:1;height:4px;border-radius:99px;cursor:pointer;touch-action:none;
+  background:rgba(120,120,128,.32)}
+.ff-gs-track::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px}
+.ff-gs-fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--accent);
   transition:width .18s var(--ease)}
 .ff-gs.is-drag .ff-gs-fill{transition:none}
 
-.ff-gs-thumb{position:absolute;top:50%;width:18px;height:18px;border-radius:99px;pointer-events:none;
+.ff-gs-thumb{position:absolute;top:50%;width:22px;height:22px;border-radius:99px;pointer-events:none;
   transform:translate(-50%,-50%);background:#fff;
-  box-shadow:0 2px 7px -1px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.06);
-  transition:left .18s var(--ease), transform .18s var(--ease), box-shadow .2s var(--ease)}
-.ff-gs-track:hover .ff-gs-thumb{box-shadow:0 2px 8px -1px rgba(0,0,0,.5), 0 0 0 5px var(--accent-soft)}
-.ff-gs.is-drag .ff-gs-fill{transition:none}
-.ff-gs.is-drag .ff-gs-thumb{transition:transform .15s var(--ease);
-  transform:translate(-50%,-50%) scale(1.18);
-  animation:ffGsPulse 1s var(--ease) infinite}
-@keyframes ffGsPulse{
-  0%{box-shadow:0 4px 12px -2px rgba(0,0,0,.55), 0 0 0 1px var(--accent-bright), 0 0 0 2px color-mix(in srgb,var(--accent-bright) 60%,transparent)}
-  70%{box-shadow:0 4px 12px -2px rgba(0,0,0,.55), 0 0 0 1px var(--accent-bright), 0 0 0 14px color-mix(in srgb,var(--accent-bright) 0%,transparent)}
-  100%{box-shadow:0 4px 12px -2px rgba(0,0,0,.55), 0 0 0 1px var(--accent-bright), 0 0 0 14px transparent}}
-.ff-gs-hint{display:block;margin-top:11px;font-size:12px;color:var(--text-3);line-height:1.45;position:relative;z-index:2}
+  box-shadow:0 .5px 1.5px rgba(0,0,0,.3), 0 3px 8px rgba(0,0,0,.3);
+  transition:left .18s var(--ease)}
+.ff-gs.is-drag .ff-gs-thumb{transition:none}
+.ff-gs-hint{display:none}
 
-/* glass toggle */
-.ff-gtoggle{width:52px;height:30px;border-radius:99px;flex-shrink:0;position:relative;
-  background:rgba(255,255,255,.08);
-  box-shadow:inset 0 1.5px 3px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.07);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  transition:background .3s var(--ease),box-shadow .3s var(--ease)}
-.ff-gtoggle.is-on{background:linear-gradient(90deg,var(--accent-deep),var(--accent));
-  box-shadow:0 0 16px -3px var(--accent-glow), inset 0 0 0 1px rgba(255,255,255,.14)}
-.ff-gtoggle-knob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:99px;
-  background:linear-gradient(155deg,rgba(255,255,255,.85),rgba(255,255,255,.4));
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-  box-shadow:0 3px 8px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.8);
-  transition:left .3s var(--ease)}
-.ff-gtoggle.is-on .ff-gtoggle-knob{left:25px}
+/* glass toggle — iOS switch */
+.ff-gtoggle{width:50px;height:30px;border-radius:99px;flex-shrink:0;position:relative;
+  background:rgba(120,120,128,.32);
+  transition:background .25s var(--ease)}
+.ff-gtoggle.is-on{background:var(--good)}
+.ff-gtoggle-knob{position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:99px;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.18);
+  transition:left .25s var(--ease)}
+.ff-gtoggle.is-on .ff-gtoggle-knob{left:22px}
 
 @media (max-width:1000px){
   .ff-content > .ff-grid[data-imp]{grid-template-columns:1fr !important}
   .ff-content > .ff-grid[data-prof]{grid-template-columns:1fr !important}
+  /* Profil-Seite: 2-spaltige Karten-Reihen (Profil+Konto, Zonen) stapeln */
+  .ff-content [data-prof] > .ff-grid{grid-template-columns:1fr !important}
 }
 
 /* ============================================================
-   DESIGN TAB — background picker (style tiles + colour swatches)
+   DESIGN TAB — scene picker + colour swatches (Apple Settings)
    ============================================================ */
-.ff-bgtiles{display:grid;grid-template-columns:repeat(5,1fr);gap:13px}
+.ff-bgtiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .ff-bgtile{position:relative;border:0;padding:0;background:none;cursor:pointer;display:block;
   -webkit-tap-highlight-color:transparent}
-.ff-bgprev{position:relative;width:100%;aspect-ratio:16/11;overflow:hidden;border-radius:13px;
-  background:#0a0b10;border:1px solid var(--line);
-  transition:border-color .2s var(--ease),box-shadow .25s var(--ease),transform .25s var(--ease)}
-.ff-bgtile:hover .ff-bgprev{border-color:var(--line-2);transform:translateY(-2px)}
-.ff-bgtile.is-active .ff-bgprev{border-color:transparent;
-  box-shadow:0 0 0 2px var(--accent-bright), 0 0 0 6px var(--accent-soft), 0 14px 30px -16px var(--accent-glow)}
+.ff-bgtile-shot{position:relative;display:block;border-radius:12px}
+.ff-bgprev{position:relative;width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:12px;
+  background:#0a0b10}
+.ff-bgprev::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
+.ff-bgtile-shot::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:0 0 0 2px transparent;transition:box-shadow .2s var(--ease)}
+.ff-bgtile:hover .ff-bgtile-shot::after{box-shadow:0 0 0 2px rgba(255,255,255,.14)}
+.ff-bgtile.is-active .ff-bgtile-shot::after{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--accent)}
+/* mini glass window inside the preview */
+.ff-bgprev-ui{position:absolute;left:11%;bottom:13%;width:54%;height:32%;border-radius:5px;
+  background:rgba(255,255,255,.13);
+  -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28), 0 4px 10px rgba(0,0,0,.25);pointer-events:none}
+.ff-bgprev-ui::before{content:"";position:absolute;left:12%;top:24%;width:44%;height:12%;border-radius:99px;
+  background:rgba(255,255,255,.75)}
+.ff-bgprev-ui::after{content:"";position:absolute;left:12%;top:56%;width:64%;height:10%;border-radius:99px;
+  background:rgba(255,255,255,.35)}
 .ff-bgtile-label{display:block;margin-top:9px;font-size:12px;font-weight:500;letter-spacing:-.01em;
   color:var(--text-3);text-align:center;transition:color .2s var(--ease)}
 .ff-bgtile.is-active .ff-bgtile-label{color:var(--text)}
 .ff-bgtile:hover .ff-bgtile-label{color:var(--text-2)}
-.ff-bgtile-check{position:absolute;top:8px;right:8px;z-index:2;width:21px;height:21px;border-radius:99px;
-  background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;
-  border:2px solid rgba(0,0,0,.35);box-shadow:0 3px 9px rgba(0,0,0,.45);animation:ff-pop-in .25s var(--ease)}
 
-.ff-bg-controls{display:grid;grid-template-columns:auto 1fr;gap:34px;align-items:start;
-  margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
-.ff-bg-sliders{display:flex;flex-direction:column;gap:4px;min-width:0}
-@media (max-width:680px){.ff-bg-controls{grid-template-columns:1fr;gap:20px}}
-.ff-bg-controls--solo{grid-template-columns:1fr}
+.ff-bg-controls{display:flex;flex-direction:column;margin-top:20px;padding-top:4px;
+  border-top:1px solid var(--line-soft)}
+.ff-bg-colorrow{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.ff-bg-sliders{display:flex;flex-direction:column;min-width:0}
+
+.ff-ds-foot{font-size:12px;line-height:1.5;color:var(--text-4);text-align:center;margin:0;padding:0 12px}
 
 /* custom photo import */
-.ff-photo-import{display:flex;align-items:center;gap:14px;margin-top:14px;padding:12px 14px;
-  border:1px dashed var(--line-2);border-radius:13px;background:var(--panel-2);
+.ff-photo-import{display:flex;align-items:center;gap:14px;margin-top:16px;padding:12px 14px;
+  border:1px dashed var(--line-2);border-radius:12px;background:var(--panel-2);
   transition:border-color .2s var(--ease),background .2s var(--ease)}
 .ff-photo-import.is-drag{border-color:var(--accent-bright);background:var(--accent-soft)}
 .ff-photo-thumb{position:relative;width:66px;height:46px;flex-shrink:0;border-radius:9px;
@@ -1468,15 +1555,31 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
   .ff-photo-import .row{width:100%}
 }
 
-.ff-swatches{display:flex;gap:11px;flex-wrap:wrap}
-.ff-swatch{position:relative;width:32px;height:32px;border-radius:99px;border:0;padding:0;cursor:pointer;
-  background:var(--sw);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
-  transition:transform .18s var(--ease),box-shadow .2s var(--ease)}
-.ff-swatch:hover{transform:scale(1.1)}
-.ff-swatch.is-active{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--sw)}
+.ff-swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ff-swatch{position:relative;width:28px;height:28px;border-radius:99px;border:0;padding:0;cursor:pointer;
+  background:var(--sw);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+  transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .25s var(--ease)}
+.ff-swatch:hover{transform:scale(1.22) translateY(-1px);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),
+    0 4px 14px color-mix(in srgb, var(--sw) 55%, transparent),
+    0 1px 4px rgba(0,0,0,.35)}
+.ff-swatch:active{transform:scale(1.04);transition-duration:.1s,.1s}
+.ff-swatch.is-active::after{content:"";position:absolute;inset:0;margin:auto;width:12px;height:12px;
+  background:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35));
+  animation:ff-sw-pop .3s cubic-bezier(.34,1.56,.64,1);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M2.5 7.5 5.6 10.6 11.5 3.8' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M2.5 7.5 5.6 10.6 11.5 3.8' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+@keyframes ff-sw-pop{from{transform:scale(0)}to{transform:scale(1)}}
+/* Regenbogen-Spektrum-Option */
+.ff-swatch--rainbow{--sw:#b06cff;
+  background:conic-gradient(from 210deg,#ff4d4d,#ffb13d,#35d073,#38b6ff,#7C5CFF,#ff4fd8,#ff4d4d)}
+.ff-swatch--rainbow:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),
+  0 4px 14px rgba(176,108,255,.5), 0 1px 4px rgba(0,0,0,.35)}
+/* eigener Farbwähler — neutraler Kreis mit Plus */
 .ff-swatch--custom{overflow:hidden;display:flex;align-items:center;justify-content:center;
-  background:conic-gradient(from 210deg,#ff2e2e,#ffc21f,#16c560,#2f5cff,#7C5CFF,#ff2e2e)}
-.ff-swatch--custom.is-active{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--sw)}
+  background:rgba(120,120,128,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.ff-swatch--custom.is-active{background:var(--sw)}
+.ff-swatch--custom.is-active svg{display:none}
 .ff-swatch--custom input{position:absolute;inset:-4px;width:calc(100% + 8px);height:calc(100% + 8px);
   opacity:0;cursor:pointer;border:0;padding:0}
 
@@ -1551,10 +1654,11 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 .ff-actions{display:flex;align-items:center;gap:10px;position:relative}
 .ff-glass-icon.is-on{background:var(--accent-soft) !important;color:var(--accent-bright)}
 .ff-glass-icon.is-on svg{color:var(--accent-bright)}
-.ff-badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;
+.ff-badge{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;padding:0 4px;
   display:flex;align-items:center;justify-content:center;border-radius:99px;
-  background:var(--accent);color:#fff;font-size:10px;font-weight:700;line-height:1;
-  font-variant-numeric:tabular-nums;border:2px solid #000;box-shadow:0 0 0 1px var(--accent-glow)}
+  background:var(--accent);color:#fff;font-size:10px;font-weight:600;line-height:1;
+  font-variant-numeric:tabular-nums;border:2px solid #000;
+  box-shadow:0 2px 6px -2px rgba(0,0,0,.6)}
 
 .ff-pop-backdrop{position:fixed;inset:0;z-index:60;background:transparent}
 .ff-pop{position:absolute;top:calc(100% + 12px);right:0;z-index:61;width:380px;max-width:calc(100vw - 40px);

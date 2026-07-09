@@ -2,7 +2,7 @@
 (function () {
   const { createElement: h, useState, useEffect, useRef, Fragment } = React;
   const UI = window.UI;
-  const { Shell, Topbar, SportIcon, AnimatedWordmark } = UI;
+  const { Shell, Topbar, SportIcon, AnimatedWordmark, BrandLogo } = UI;
   const Icon = window.Icon;
   const S = window.Screens;
   const { useTweaks, TweaksPanel, TweakSection, TweakColor,
@@ -87,7 +87,7 @@
     jahr: { t: 'Jahres Übersicht', s: () => 'Saison 2026 · Periodisierung & Trainingsfokus' },
     prognose: { t: 'Form-Prognose', s: () => 'TSB-Projektion & Taper-Optimierung bis zum Zielwettkampf' },
     woche: { t: 'Planung', s: () => 'KI-Empfehlung für die kommende Woche' },
-    diag: { t: 'Leistungsdiagnostik', s: () => 'Telemetrie, Trainingsload & Einheiten-Vergleich' },
+    diag: { t: 'Leistungsdiagnostik', s: () => 'Telemetrie, Trainingsload & Aktivitäten-Vergleich' },
     import: { t: 'Import & Sync', s: () => 'FIT / CSV Import · Strava · Apple Health' },
     design: { t: 'Design', s: () => 'Hintergrund, Material & Form der Oberfläche' },
     profil: { t: 'Profileinstellungen', s: () => 'Persönliche Daten, HF- & Leistungszonen' },
@@ -174,6 +174,25 @@
   function Placeholder({ name }) {
     return h('div', { className: 'panel panel-pad', style: { textAlign: 'center', padding: 60, color: 'var(--text-3)' } },
       h(Icon, { name: 'layers', size: 30 }), h('div', { style: { marginTop: 12 } }, `${name} – in Arbeit`));
+  }
+
+  /* Catches render errors in a screen so one bad widget (e.g. a metric fed
+     sparse/empty data) shows a recoverable message instead of blanking the
+     whole app to a black screen. Keyed by route → remounts (clears) on nav. */
+  class ScreenBoundary extends React.Component {
+    constructor(props) { super(props); this.state = { error: null }; }
+    static getDerivedStateFromError(error) { return { error: error }; }
+    componentDidCatch(error, info) { try { console.error('[FitFlow] Ansicht-Fehler:', error, info); } catch (e) { /* noop */ } }
+    render() {
+      if (this.state.error) {
+        return h('div', { className: 'panel', style: { margin: 24, padding: 28, textAlign: 'center' } },
+          h('h2', { className: 'h2', style: { marginBottom: 8 } }, 'Diese Ansicht konnte nicht geladen werden'),
+          h('p', { style: { color: 'var(--text-3)', fontSize: 13, marginBottom: 18 } },
+            'Ein unerwarteter Fehler ist aufgetreten. Bitte lade die Seite neu.'),
+          h('button', { className: 'btn btn--primary', onClick: () => location.reload() }, 'Neu laden'));
+      }
+      return this.props.children;
+    }
   }
 
   function App({ locked, startTour, onTourDone }) {
@@ -279,7 +298,7 @@
       h(TopbarActions, { onNav: nav, onOpenActivity: openActivity }));
 
     return h(Fragment, null,
-      h(Shell, { current: route, onNav: nav, topbar }, screen),
+      h(Shell, { current: route, onNav: nav, topbar }, h(ScreenBoundary, { key: route }, screen)),
       intro && h(IntroSplash, { onDone: () => setIntro(false) }),
       tour === 'ask' && h(TourPrompt, { onStart: () => setTour('run'), onLater: endTour }),
       tour === 'run' && window.OnboardingTour && h(window.OnboardingTour, { onNav: nav, onFinish: endTour }),
@@ -371,7 +390,7 @@
       h('div', { className: 'ff-intro-cover' }),
       h('div', { className: 'ff-intro-scrim' }),
       h('div', { className: 'ff-intro-logo', ref: floatRef },
-        h(AnimatedWordmark, { text: 'FitFlow', replayKey: 'intro' })));
+        h(BrandLogo, { replayKey: 'intro' })));
   }
 
   function BootSplash({ label }) {
@@ -425,7 +444,17 @@
       if (!Auth) return;
       // bump on every auth change (login/logout AND markOnboarded) so Root
       // re-applies the active account's dataset and the screen swaps.
-      return Auth.subscribe((s) => { setAuthed(!!s.loggedIn); bump((n) => n + 1); });
+      return Auth.subscribe((s) => {
+        setAuthed(!!s.loggedIn); bump((n) => n + 1);
+        // real account (re)connected → pull cloud-synced imports in the
+        // background, then re-render if the local cache changed (cross-device).
+        if (s.loggedIn && window.FFImports && window.FFImports.isCloud) {
+          const acc = Auth.currentAccount && Auth.currentAccount();
+          if (window.FFImports.isCloud(acc)) {
+            window.FFImports.pullCloud(acc).then((changed) => { if (changed) bump((n) => n + 1); });
+          }
+        }
+      });
     }, []);
     if (phase === 'loading') return h(BootSplash, { label: API && API.mode === 'live' ? 'Mit Backend verbinden …' : 'Daten werden geladen …' });
     if (phase === 'error') return h(BootError, { err, onRetry: run, onMock: () => { API.useMock(); run(); } });
@@ -449,9 +478,18 @@
       const Onb = window.OnboardingFlow;
       if (Onb) return h(Onb, { account: Auth.currentAccount(), onDone: () => bump((n) => n + 1) });
     }
-    // authed + onboarded: load the active account's dataset (demo = full)
-    if (Acct) Acct.apply(Auth ? Auth.isEmptyAccount() : false, Auth ? Auth.currentAccount() : null);
+    // authed + onboarded: load the active account's dataset.
+    // Das DEMO-Konto zeigt den Beispiel-Datensatz. Ein echtes Konto bleibt im
+    // geführten Leerzustand (Erste-Schritte-Checkliste), BIS es echte
+    // Aktivitäten hat — dann öffnet sich das echte Dashboard, dessen Kennzahlen
+    // vollständig aus den eigenen Importen berechnet werden (FFMetrics).
     const acc = Auth ? Auth.currentAccount() : null;
+    const hasData = !!(acc && !acc.demo && acc.email && window.FFImports && FFImports.count(acc) > 0);
+    // the user can also open the dashboard manually from the Erste-Schritte
+    // checklist (even with no data yet — it then renders empty, never demo).
+    const openedManually = !!(Auth && Auth.isDashboardOpen && Auth.isDashboardOpen(acc));
+    const isEmpty = acc ? (!acc.demo && !hasData && !openedManually) : false;
+    if (Acct) Acct.apply(isEmpty, acc);
     return h(App, { key: acc ? acc.email : 'live' });
   }
 

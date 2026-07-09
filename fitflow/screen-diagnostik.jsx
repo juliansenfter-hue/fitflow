@@ -7,7 +7,7 @@
   const SPORT = window.UI.SPORT;
   const fmt = FF.fmt;
 
-  const zoneFromMin = (zoneMin) => FF.zoneColors.map((z, i) => ({ zone: z, z: z.toUpperCase(), value: zoneMin[i] || 0 }));
+  const zoneFromMin = (zoneMin) => FF.zoneColors.map((z, i) => ({ zone: z, z: z.toUpperCase(), value: (zoneMin && zoneMin[i]) || 0 }));
 
   /* ---- metric tile in detail ---- */
   function M({ label, value, unit, color }) {
@@ -19,11 +19,13 @@
   }
 
   function Telemetry({ a }) {
+    const s = a.streams || {}; // Strava summary imports have no per-second streams
     const charts = [];
-    if (a.streams.power) charts.push({ key: 'power', label: 'Leistung', unit: ' W', color: 'sport-bike', series: [{ data: a.streams.power, color: 'sport-bike', label: 'Watt', unit: ' W' }] });
-    if (a.streams.pace) charts.push({ key: 'pace', label: 'Pace', unit: '', color: 'sport-run', series: [{ data: a.streams.pace.map((s) => 360 - s), color: 'sport-run', label: 'Tempo', unit: '', fill: true }], paceRaw: a.streams.pace });
-    if (a.streams.hr) charts.push({ key: 'hr', label: 'Herzfrequenz', unit: ' bpm', color: 'z5', series: [{ data: a.streams.hr, color: 'z5', label: 'HF', unit: ' bpm' }] });
-    if (a.streams.cadence) charts.push({ key: 'cad', label: 'Kadenz', unit: a.sport === 'run' ? ' spm' : ' rpm', color: 'info', series: [{ data: a.streams.cadence, color: 'info', label: 'Kadenz', unit: a.sport === 'run' ? ' spm' : ' rpm' }] });
+    if (s.power) charts.push({ key: 'power', label: 'Leistung', unit: ' W', color: 'sport-bike', series: [{ data: s.power, color: 'sport-bike', label: 'Watt', unit: ' W' }] });
+    if (s.pace) charts.push({ key: 'pace', label: 'Pace', unit: '', color: 'sport-run', series: [{ data: s.pace.map((v) => 360 - v), color: 'sport-run', label: 'Tempo', unit: '', fill: true }], paceRaw: s.pace });
+    if (s.hr) charts.push({ key: 'hr', label: 'Herzfrequenz', unit: ' bpm', color: 'z5', series: [{ data: s.hr, color: 'z5', label: 'HF', unit: ' bpm' }] });
+    if (s.cadence) charts.push({ key: 'cad', label: 'Kadenz', unit: a.sport === 'run' ? ' spm' : ' rpm', color: 'info', series: [{ data: s.cadence, color: 'info', label: 'Kadenz', unit: a.sport === 'run' ? ' spm' : ' rpm' }] });
+    if (!charts.length) return h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, 'Keine Angabe — für diese Aktivität liegen keine Telemetrie-Verläufe vor.');
     return h('div', { className: 'col gap-16' }, charts.map((ch) =>
       h('div', { key: ch.key, className: 'col gap-8' },
         h('div', { className: 'row between center' },
@@ -45,16 +47,16 @@
               h('span', null, fmt.dateFull(a.date)), h('span', null, '·'),
               h('span', { className: 'row center gap-5' }, h(Icon, { name: 'link', size: 12 }), a.platform)))),
         h('div', { className: 'row center gap-8' },
-          h('span', { className: 'chip', style: { color: `var(--${intCol})` } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), a.intensity),
-          h('span', { className: 'chip' }, `RPE ${a.rpe}/10`))),
+          a.intensity && h('span', { className: 'chip', style: { color: `var(--${intCol})` } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), a.intensity),
+          h('span', { className: 'chip' }, a.rpe != null ? `RPE ${a.rpe}/10` : 'RPE keine Angabe'))),
 
       /* metric grid */
       h('div', { className: 'ff-metric-grid' },
         h(M, { label: 'Dauer', value: fmt.dur(a.duration) }),
         a.distance && h(M, { label: 'Distanz', value: fmt.n(a.distance, 1), unit: 'km' }),
         a.elevation && h(M, { label: 'Höhenmeter', value: fmt.big(a.elevation), unit: 'm' }),
-        h(M, { label: 'Kalorien', value: fmt.big(a.calories), unit: 'kcal' }),
-        h(M, { label: 'Trainingsload', value: a.tss, unit: 'TSS', color: intCol }),
+        h(M, { label: 'Kalorien', value: a.calories != null ? fmt.big(a.calories) : '–', unit: a.calories != null ? 'kcal' : '' }),
+        h(M, { label: 'Trainingsload', value: a.tss != null ? a.tss : '–', unit: a.tss != null ? 'TSS' : '', color: intCol }),
         a.avgPower && h(M, { label: 'Ø Leistung', value: a.avgPower, unit: 'W', color: 'sport-bike' }),
         a.maxPower && h(M, { label: 'Max Leistung', value: a.maxPower, unit: 'W' }),
         a.np && h(M, { label: 'Norm. Power', value: a.np, unit: 'W' }),
@@ -71,18 +73,20 @@
         h('div', { className: 'col gap-10' }, h('span', { className: 'label' }, 'Telemetrie'), h(Telemetry, { a })),
         h('div', { className: 'col gap-12' },
           h('span', { className: 'label' }, 'Zeit in Zonen'),
-          h(C.ZoneBars, { dist: zoneFromMin(a.zoneMin), unit: 'm' }))));
+          a.zoneMin
+            ? h(C.ZoneBars, { dist: zoneFromMin(a.zoneMin), unit: 'm' })
+            : h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, 'Keine Angabe — Strava liefert keine Zonenverteilung ohne Herzfrequenz-/Leistungsdaten.'))));
   }
 
   function Compare({ list }) {
     const rows = [
       { k: 'duration', l: 'Dauer', f: (a) => fmt.dur(a.duration), raw: (a) => a.duration },
       { k: 'distance', l: 'Distanz (km)', f: (a) => a.distance ? fmt.n(a.distance, 1) : '–', raw: (a) => a.distance || 0 },
-      { k: 'tss', l: 'Load (TSS)', f: (a) => a.tss, raw: (a) => a.tss, color: 'z4' },
-      { k: 'avgHr', l: 'Ø HF (bpm)', f: (a) => a.avgHr, raw: (a) => a.avgHr, color: 'z5' },
+      { k: 'tss', l: 'Load (TSS)', f: (a) => a.tss != null ? a.tss : '–', raw: (a) => a.tss || 0, color: 'z4' },
+      { k: 'avgHr', l: 'Ø HF (bpm)', f: (a) => a.avgHr != null ? a.avgHr : '–', raw: (a) => a.avgHr || 0, color: 'z5' },
       { k: 'avgPower', l: 'Ø Leistung (W)', f: (a) => a.avgPower || '–', raw: (a) => a.avgPower || 0, color: 'sport-bike' },
-      { k: 'calories', l: 'Kalorien', f: (a) => fmt.big(a.calories), raw: (a) => a.calories },
-      { k: 'rpe', l: 'RPE', f: (a) => `${a.rpe}/10`, raw: (a) => a.rpe },
+      { k: 'calories', l: 'Kalorien', f: (a) => a.calories != null ? fmt.big(a.calories) : '–', raw: (a) => a.calories || 0 },
+      { k: 'rpe', l: 'RPE', f: (a) => a.rpe != null ? `${a.rpe}/10` : '–', raw: (a) => a.rpe || 0 },
     ];
     return h('div', { className: 'col gap-2' },
       h('div', { className: 'ff-cmp-head', style: { gridTemplateColumns: `160px repeat(${list.length},1fr)` } },
@@ -104,7 +108,7 @@
 
   function Diagnostik({ activity, setActivity, onNav }) {
     if (FF.empty) return h(EmptyState, { icon: 'activity', title: 'Noch keine Diagnostik-Daten',
-      body: 'Importiere eine Aktivität mit Herzfrequenz-, Power- oder Pace-Daten, um Leistungs- und Einheiten-Analysen zu sehen.',
+      body: 'Importiere eine Aktivität mit Herzfrequenz-, Power- oder Pace-Daten, um Leistungs- und Aktivitäten-Analysen zu sehen.',
       cta: 'Aktivität importieren', onCta: () => onNav && onNav('import') });
     const [mode, setMode] = useState('einheiten'); // einheiten | load
     const [filter, setFilter] = useState('all');
@@ -136,7 +140,7 @@
 
     return h('div', { className: 'col gap-18' },
       h('div', { className: 'row between center wrap gap-12' },
-        h(Tabs, { items: [{ value: 'einheiten', label: 'Einheiten' }, { value: 'load', label: 'Trainingsload' }], value: mode, onChange: setMode }),
+        h(Tabs, { items: [{ value: 'einheiten', label: 'Aktivitäten' }, { value: 'load', label: 'Trainingsload' }], value: mode, onChange: setMode }),
         mode === 'einheiten' && h('div', { className: 'row center gap-10' },
           h('div', { className: 'seg' }, [['all', 'Alle'], ['bike', 'Rad'], ['run', 'Lauf'], ['lift', 'Kraft']].map(([v, l]) =>
             h('button', { key: v, className: filter === v ? 'is-active' : '', onClick: () => setFilter(v) }, l))),
@@ -146,7 +150,7 @@
       mode === 'load'
         ? h(LoadView, { weekly, tl, rampRate, ramp6 })
         : h('div', { className: 'ff-grid', style: { gridTemplateColumns: '340px minmax(0,1fr)', gap: 18, alignItems: 'start' }, 'data-diag': true },
-          h(Card, { title: `Einheiten`, icon: 'activity', pad: false,
+          h(Card, { title: `Aktivitäten`, icon: 'activity', pad: false,
             right: h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--text-3)' } }, `${acts.length}`) },
             h('div', { className: 'col', style: { padding: '4px 8px 8px', maxHeight: 660, overflowY: 'auto' } },
               acts.map((a) => {
@@ -162,7 +166,7 @@
           h(Card, { pad: true },
             compare
               ? (cmpList.length >= 2 ? h(Compare, { list: cmpList })
-                : h('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text-3)' } }, h(Icon, { name: 'layers', size: 28 }), h('div', { style: { marginTop: 12 } }, 'Wähle 2–3 Einheiten zum Vergleich')))
+                : h('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text-3)' } }, h(Icon, { name: 'layers', size: 28 }), h('div', { style: { marginTop: 12 } }, 'Wähle 2–3 Aktivitäten zum Vergleich')))
               : h(Detail, { a: FF.activities.find((a) => a.id === current) || FF.activities[0] }))));
   }
 

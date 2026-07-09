@@ -34,6 +34,7 @@
   var recovery = false;    // arrived via a password-reset link?
   var demo = false;        // local demo bypass active?
   var user = null;         // current Supabase user object (or null)
+  var testUser = null;     // local „neues, leeres Konto"-Testbypass (keine echte Mail nötig)
 
   function emit() {
     var s = Auth.get();
@@ -49,6 +50,11 @@
   }
   function isOnboarded(u) { return !!(u && u.user_metadata && u.user_metadata.onboarded); }
 
+  /* per-account "user chose to open the (still empty) dashboard" flag. Lets the
+     Erste-Schritte-Checkliste hand off to the real dashboard on demand, even
+     before any activities are imported (the dashboard then renders empty). */
+  function dashOpenKey(acc) { return 'ff-dashopen::' + String((acc && acc.email) || 'anon').toLowerCase(); }
+
   /* the clean app URL (no hash/query) — used as the redirect target for the
      reset/confirm e-mail links. Must be listed under Supabase → Auth → Redirect URLs. */
   function appUrl() { return location.href.split('#')[0].split('?')[0]; }
@@ -58,10 +64,13 @@
     client = SB.createClient(CFG.url, CFG.anonKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
     });
+    // expose the configured client so the data layer (FFImports cloud sync) can
+    // read/write the user's own rows under RLS. null when no backend is set up.
+    window.FFSupabase = client;
     client.auth.onAuthStateChange(function (event, session) {
       if (event === 'PASSWORD_RECOVERY') recovery = true;
-      // a real Supabase session always wins over the local demo bypass
-      if (session && session.user) demo = false;
+      // a real Supabase session always wins over the local bypasses
+      if (session && session.user) { demo = false; testUser = null; }
       user = session ? session.user : null;
       setReady();
     });
@@ -99,11 +108,16 @@
     isReady: function () { return ready; },
     isConfigured: function () { return !!client; },
     isRecovery: function () { return recovery; },
-    isLoggedIn: function () { return demo || !!user; },
-    isEmptyAccount: function () { if (demo) return false; return !!(user && !isOnboarded(user)); },
+    isLoggedIn: function () { return demo || !!testUser || !!user; },
+    isEmptyAccount: function () {
+      if (demo) return false;
+      if (testUser) return !testUser.onboarded;
+      return !!(user && !isOnboarded(user));
+    },
 
     get: function () {
       if (demo) return { email: DEMO.email, name: DEMO.name, loggedIn: true, empty: false, demo: true };
+      if (testUser) return { email: testUser.email, name: testUser.name, loggedIn: true, empty: !testUser.onboarded, demo: false, test: true };
       return {
         email: user ? user.email : '',
         name: nameOf(user),
@@ -114,6 +128,15 @@
     },
     currentAccount: function () {
       if (demo) return { name: DEMO.name, email: DEMO.email, sport: 'Ausdauer', goal: '', empty: false, demo: true, initials: initials(DEMO.name) };
+      if (testUser) {
+        var tm = testUser.meta || {};
+        return {
+          name: testUser.name, email: testUser.email,
+          sport: tm.sport || '', goal: tm.goal || '',
+          height: tm.height || '', weight: tm.weight || '', age: tm.age || '', sex: tm.sex || '',
+          empty: !testUser.onboarded, demo: false, test: true, initials: initials(testUser.name),
+        };
+      }
       var m = (user && user.user_metadata) || {};
       return {
         name: nameOf(user), email: user ? user.email : '',
@@ -136,6 +159,38 @@
           if (res.error) return Object.assign({ ok: false }, mapAuthError(res.error));
           demo = false; user = res.data.user; emit();
           return { ok: true, registered: false, empty: !isOnboarded(user) };
+        });
+    },
+
+    /* third-party sign-in (Google / Apple) via Supabase OAuth.
+       We build the authorize URL (skipBrowserRedirect) and pre-flight it: the
+       authorize endpoint sends CORS headers, so a 302 (opaqueredirect) means the
+       provider is enabled → we navigate to start the real flow; a 400 means the
+       provider isn't switched on yet → we surface a friendly hint instead of
+       dumping the user on a raw JSON error page. On return to appUrl() the
+       onAuthStateChange handler (detectSessionInUrl) opens the session. */
+    oauth: function (provider) {
+      var n = need(); if (n) return Promise.resolve(n);
+      var label = provider === 'apple' ? 'Apple' : 'Google';
+      var notEnabled = { ok: false, error: label + '-Login ist serverseitig noch nicht aktiviert. Bitte in Supabase → Authentication → Providers den ' + label + '-Provider einschalten.' };
+      return client.auth.signInWithOAuth({ provider: provider, options: { redirectTo: appUrl(), skipBrowserRedirect: true } })
+        .then(function (res) {
+          if (res.error || !res.data || !res.data.url) {
+            return Object.assign({ ok: false }, mapAuthError(res.error || { message: 'OAuth-URL konnte nicht erzeugt werden.' }));
+          }
+          var url = res.data.url;
+          return fetch(url, { method: 'GET', redirect: 'manual' }).then(function (r) {
+            if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+              window.location.assign(url);            // enabled → off to the provider
+              return { ok: true, redirecting: true };
+            }
+            if (r.status === 400 || r.status === 422) return notEnabled;
+            window.location.assign(url);              // unexpected → let the provider screen decide
+            return { ok: true, redirecting: true };
+          }).catch(function () {
+            window.location.assign(url);              // CORS/network hiccup → best-effort redirect
+            return { ok: true, redirecting: true };
+          });
         });
     },
 
@@ -231,6 +286,7 @@
 
     /* mark the active account as onboarded → leaves the empty state */
     markOnboarded: function () {
+      if (testUser) { testUser.onboarded = true; emit(); return Promise.resolve({ ok: true }); }
       if (demo || !client || !user) return Promise.resolve({ ok: true });
       return client.auth.updateUser({ data: { onboarded: true } }).then(function (res) {
         if (!res.error) { user = res.data.user; emit(); }
@@ -238,9 +294,40 @@
       });
     },
 
+    /* the Erste-Schritte checklist's „Dashboard öffnen" → leave the empty state
+       and show the real dashboard, even without imported activities. Persists so
+       a reload keeps the dashboard open, and emits so Root re-renders. */
+    openDashboard: function () {
+      var acc = Auth.currentAccount();
+      try { localStorage.setItem(dashOpenKey(acc), '1'); } catch (e) { /* quota — ignore */ }
+      emit();
+      return Promise.resolve({ ok: true });
+    },
+    isDashboardOpen: function (acc) {
+      acc = acc || Auth.currentAccount();
+      if (!acc || acc.demo) return false;
+      try { return !!localStorage.getItem(dashOpenKey(acc)); } catch (e) { return false; }
+    },
+
+    /* force Root to re-render and re-evaluate empty↔full — used after a background
+       data change (e.g. a Strava sync that just pulled in the first activities),
+       so the real dashboard opens automatically instead of staying on the checklist. */
+    refresh: function () { emit(); },
+
+    /* lokaler Test: frisches, leeres Konto simulieren → Onboarding + Video + leeres Dashboard,
+       ganz ohne echte E-Mail / Supabase. */
+    loginTest: function () {
+      demo = false; user = null; recovery = false;
+      testUser = { name: 'Test-Konto', email: 'test@fitflow.local', onboarded: false, meta: {} };
+      try { localStorage.removeItem(dashOpenKey(testUser)); } catch (e) { /* noop */ }
+      emit();
+      return Promise.resolve({ ok: true, registered: true, empty: true, test: true });
+    },
+
     /* Onboarding-Wizard: Profilfelder + onboarded:true in user_metadata speichern */
     completeOnboarding: function (profile) {
       profile = profile || {};
+      if (testUser) { testUser.meta = Object.assign({}, testUser.meta, profile); testUser.onboarded = true; emit(); return Promise.resolve({ ok: true }); }
       if (demo) return Promise.resolve({ ok: true });
       if (!client || !user) return Promise.resolve({ ok: false });
       var data = Object.assign({}, profile, { onboarded: true });
@@ -251,19 +338,40 @@
     },
 
     logout: function () {
-      demo = false; recovery = false;
+      demo = false; recovery = false; testUser = null;
       if (!client) { user = null; emit(); return Promise.resolve(); }
       return client.auth.signOut().then(function () { user = null; emit(); });
     },
 
-    /* best-effort self-delete: needs a `delete_user` RPC in Supabase (optional);
-       falls back to signing out so the account is at least left. */
+    /* Real self-delete via the Supabase `delete_user` RPC (SECURITY DEFINER,
+       deletes auth.uid()). Returns { ok, error }. On success the auth user is
+       gone server-side and we sign the (now-invalid) session out. If the RPC
+       is missing/forbidden we report it instead of faking success, so the
+       account is NOT silently left behind pretending to be deleted. */
     deleteAccount: function () {
-      if (demo) { demo = false; emit(); return Promise.resolve(); }
-      if (!client) { user = null; emit(); return Promise.resolve(); }
-      return client.rpc('delete_user').catch(function () { /* RPC not set up — ignore */ })
-        .then(function () { return client.auth.signOut(); })
-        .then(function () { user = null; emit(); });
+      // local bypasses (demo / empty-test account): just drop local state
+      if (testUser) { testUser = null; emit(); return Promise.resolve({ ok: true, local: true }); }
+      if (demo) { demo = false; emit(); return Promise.resolve({ ok: true, local: true }); }
+      if (!client) { user = null; emit(); return Promise.resolve({ ok: true, local: true }); }
+
+      function friendly(err) {
+        var m = (err && (err.message || err.msg || err.error_description)) || '';
+        if (/function .*delete_user.* does not exist|could not find the function|schema cache/i.test(m)) {
+          return 'Die Server-Funktion „delete_user" fehlt in Supabase. Bitte das mitgelieferte SQL-Snippet im Supabase SQL-Editor ausführen.';
+        }
+        if (/permission denied|not authorized|jwt/i.test(m)) {
+          return 'Löschen wurde vom Server abgelehnt (fehlende Berechtigung). Bitte die delete_user-Funktion + Grant prüfen.';
+        }
+        return 'Konto konnte nicht gelöscht werden: ' + (m || 'unbekannter Fehler') + '.';
+      }
+
+      return client.rpc('delete_user').then(function (res) {
+        if (res && res.error) return { ok: false, error: friendly(res.error) };
+        return client.auth.signOut().catch(function () { /* session already invalid */ })
+          .then(function () { user = null; recovery = false; emit(); return { ok: true }; });
+      }, function (err) {
+        return { ok: false, error: friendly(err) };
+      });
     },
 
     exportData: function () {

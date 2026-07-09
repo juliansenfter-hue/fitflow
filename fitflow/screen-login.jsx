@@ -99,6 +99,19 @@
     const goMode = (m) => { setMode(m); setErr(null); setInfo(null); setOk(false);
       if (m === 'forgot') { setFStep('email'); setFCode(''); } };
     const fillDemo = () => { goMode('login'); setEmail(Auth ? Auth.get().email || 'julian.senfter@gmail.com' : ''); setPw('fitflow'); };
+    const startTest = async () => {
+      if (ok || busy) return;
+      setErr(null); setInfo(null);
+      if (Auth && Auth.loginTest) { const res = await Auth.loginTest(); finish(res); }
+    };
+    const submitOAuth = async (provider) => {
+      if (ok || busy) return;
+      setBusy(true); setErr(null); setInfo(null);
+      const res = await Auth.oauth(provider);
+      // success → the browser navigates to the provider (res.redirecting); on return
+      // the session opens automatically. Only an error lands back here.
+      if (!res.ok) return fail(res);
+    };
 
     const isReg = mode === 'register';
     const isForgot = mode === 'forgot';
@@ -113,7 +126,7 @@
       return h('div', { className: 'ff-login' },
         h('div', { className: 'ff-login-scrim' }),
         h('form', { className: 'ff-login-card', onSubmit: isCode ? submitCode : submitForgot, noValidate: true },
-          h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+          h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
           h('h1', { className: 'ff-login-title' }, isCode ? 'Code eingeben' : 'Passwort zurücksetzen'),
           h('p', { className: 'ff-login-sub' }, isCode
             ? `Gib den 6-stelligen Code ein, den wir an ${fEmail} geschickt haben.`
@@ -137,7 +150,7 @@
     return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
       h('div', { className: 'ff-login-scrim' }),
       h('form', { className: 'ff-login-card', onSubmit: isReg ? submitRegister : submitLogin, noValidate: true },
-        h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+        h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
         h('h1', { className: 'ff-login-title' }, isReg ? 'Konto erstellen' : 'Willkommen zurück'),
         h('p', { className: 'ff-login-sub' }, isReg
           ? 'Lege ein neues Profil an — du startest mit einem leeren Trainingstagebuch.'
@@ -173,10 +186,12 @@
 
         h('div', { className: 'ff-login-or' }, h('span', null, 'oder')),
         h('div', { className: 'ff-login-social' },
-          h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandApple), 'Apple'),
-          h('button', { type: 'button', className: 'ff-login-soc' }, h(BrandGoogle), 'Google')),
+          h('button', { type: 'button', className: 'ff-login-soc', disabled: ok || busy, onClick: () => submitOAuth('apple') }, h(BrandApple), 'Apple'),
+          h('button', { type: 'button', className: 'ff-login-soc', disabled: ok || busy, onClick: () => submitOAuth('google') }, h(BrandGoogle), 'Google')),
         h('div', { className: 'ff-login-demo' },
-          h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)')),
+          h('button', { type: 'button', className: 'ff-login-link', onClick: fillDemo }, 'Demo ansehen (ohne Konto)'),
+          h('span', { className: 'ff-login-demo-sep', 'aria-hidden': true }, '\u00b7'),
+          h('button', { type: 'button', className: 'ff-login-link', onClick: startTest }, 'Onboarding testen (leeres Konto)')),
 
         h('div', { className: 'ff-login-foot' }, isReg
           ? h(Fragment, null, 'Schon ein Konto? ', h('button', { type: 'button', className: 'ff-login-link', onClick: () => goMode('login') }, 'Anmelden'))
@@ -208,7 +223,7 @@
     return h('div', { className: 'ff-login' + (ok ? ' is-ok' : '') },
       h('div', { className: 'ff-login-scrim' }),
       h('form', { className: 'ff-login-card', onSubmit: submit, noValidate: true },
-        h('div', { className: 'ff-login-brand' }, h('div', { className: 'ff-login-word' }, 'FitFlow')),
+        h('div', { className: 'ff-login-brand' }, h('img', { className: 'ff-login-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false })),
         h('h1', { className: 'ff-login-title' }, 'Neues Passwort setzen'),
         h('p', { className: 'ff-login-sub' }, 'Wähle ein neues Passwort für dein Konto.'),
         h('div', { className: 'ff-login-fields' },

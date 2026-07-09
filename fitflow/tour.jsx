@@ -145,17 +145,29 @@
     const [err, setErr] = useState(false);
     const [done, setDone] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [video, setVideo] = useState(false);      // Willkommens-Video läuft
+    const [videoEnded, setVideoEnded] = useState(false);
+    const [pendingAcc, setPendingAcc] = useState(null); // Antworten, die nach dem Video gespeichert werden
     const step = ONB_Q[i];
     const firstName = account && account.name ? String(account.name).split(/\s+/)[0] : '';
 
+    // Antworten NICHT sofort speichern — sonst markiert completeOnboarding das Konto
+    // direkt als onboarded und Root springt am Video vorbei aufs Dashboard.
+    // Erst „Alles bereit" → Video, und beim „Los geht's"-Klick speichern + weiter.
     const finish = (acc) => {
-      setDone(true); setSaving(true);
+      setPendingAcc(acc || {});
+      setDone(true);
+      setTimeout(function () { setVideo(true); }, 1100);
+    };
+    const enterApp = () => {
+      setSaving(true);
+      // Nach „Los geht's" immer auf dem Dashboard landen — dort zeigt das leere Konto
+      // das „Willkommen / Erste Schritte"-Feld. Ohne das würde die App den zuletzt in
+      // der URL stehenden Tab-Hash (z. B. #design) übernehmen und woanders starten.
+      try { location.hash = 'dashboard'; } catch (e) {}
       const fin = (window.FFAuth && window.FFAuth.completeOnboarding)
-        ? window.FFAuth.completeOnboarding(acc) : Promise.resolve();
-      Promise.resolve(fin).then(function () {
-        setSaving(false);
-        setTimeout(function () { onDone && onDone(); }, 900);
-      });
+        ? window.FFAuth.completeOnboarding(pendingAcc || {}) : Promise.resolve();
+      Promise.resolve(fin).then(function () { onDone && onDone(); });
     };
     const advance = (acc) => {
       setOk(false); setVal(''); setErr(false);
@@ -184,6 +196,23 @@
     const progress = h('div', { className: 'ff-onb-progress' }, ONB_Q.map(function (_, k) {
       return h('span', { key: k, className: 'ff-onb-pip' + (k < i ? ' is-done' : '') + (k === i ? ' is-active' : '') });
     }));
+
+    if (video) {
+      return h('div', { className: 'ff-onb ff-onb--video' },
+        h('video', {
+          className: 'ff-onb-video', src: 'fitflow/logo-intro.mp4',
+          autoPlay: true, muted: true, playsInline: true, controls: false, preload: 'auto',
+          onEnded: function () { setVideoEnded(true); },
+          // Sicherheitsnetz: falls der Browser das Logo-Video nicht abspielen kann
+          // (Format/Autoplay), nicht auf dem schwarzen Video-Screen hängen bleiben.
+          onError: function () { setVideoEnded(true); },
+        }),
+        videoEnded && h('div', { className: 'ff-welcome' },
+          h('img', { className: 'ff-welcome-logo', src: 'fitflow/welcome-mark.png', alt: 'FitFlow', draggable: false }),
+          h('h1', { className: 'ff-welcome-title' }, firstName ? 'Willkommen,\u00a0' + firstName : 'Willkommen'),
+          h('button', { type: 'button', className: 'ff-welcome-go', disabled: saving, onClick: enterApp },
+            saving ? 'Wird gespeichert …' : 'Los geht\u2019s', !saving && h(Icon, { name: 'chevR', size: 22 }))));
+    }
 
     if (done) {
       return h('div', { className: 'ff-onb' }, progress,

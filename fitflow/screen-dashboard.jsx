@@ -8,17 +8,17 @@
 
   /* ---------- Morgen-Check: model + persistence + derived note ---------- */
   const CK_METRICS = [
-    { key: 'sleep',  label: 'Schlaf', icon: 'moon', opts: [
-      { v: 'gut',    label: 'Gut',    tone: 'good' }, { v: 'ok', label: 'Ok', tone: 'mid' }, { v: 'müde',   label: 'Müde',   tone: 'bad' }] },
-    { key: 'legs',   label: 'Beine',  icon: 'lift', opts: [
-      { v: 'frisch', label: 'Frisch', tone: 'good' }, { v: 'ok', label: 'Ok', tone: 'mid' }, { v: 'schwer', label: 'Schwer', tone: 'bad' }] },
-    { key: 'stress', label: 'Stress', icon: 'bolt', opts: [
+    { key: 'fatigue', label: 'Müdigkeit', icon: 'moon', opts: [
+      { v: 'frisch', label: 'Frisch', tone: 'good' }, { v: 'ok', label: 'Ok', tone: 'mid' }, { v: 'müde', label: 'Müde', tone: 'bad' }] },
+    { key: 'stress',  label: 'Stress',    icon: 'bolt', opts: [
       { v: 'ruhig',  label: 'Ruhig',  tone: 'good' }, { v: 'ok', label: 'Ok', tone: 'mid' }, { v: 'hoch',   label: 'Hoch',   tone: 'bad' }] },
+    { key: 'injury',  label: 'Verletzungen', icon: 'heart', opts: [
+      { v: 'nein', label: 'Nein', tone: 'good' }, { v: 'ja', label: 'Ja', tone: 'bad' }] },
   ];
   const CK_KEY = 'ff-checkin-' + FF.TODAY.toISOString().slice(0, 10);
   function loadCheckin() {
     try { const s = localStorage.getItem(CK_KEY); if (s) return JSON.parse(s); } catch (e) {}
-    return { sleep: null, legs: null, stress: null, time: null };
+    return { fatigue: null, stress: null, injury: null, note: '', time: null };
   }
   function saveCheckin(c) {
     try { localStorage.setItem(CK_KEY, JSON.stringify(c)); } catch (e) {}
@@ -27,22 +27,22 @@
   }
   function checkinSummary(c) {
     c = c || {};
-    const complete = c.sleep && c.legs && c.stress;
+    const complete = c.fatigue && c.stress && c.injury;
     if (!complete) return { complete: false, clause: null, note: null, tone: 'mid' };
     const bad = [];
-    if (c.legs === 'schwer') bad.push('Beine schwer');
-    if (c.sleep === 'müde') bad.push('wenig erholt');
+    if (c.injury === 'ja') bad.push('Verletzung gemeldet');
+    if (c.fatigue === 'müde') bad.push('müde');
     if (c.stress === 'hoch') bad.push('hoher Stress');
     if (bad.length) {
-      const note = c.legs === 'schwer' ? 'Beine müde — harte Intervalle ggf. auf Sweet-Spot zurücknehmen.'
-        : c.sleep === 'müde' ? 'Wenig erholt — Warm-up verlängern, Intensität beobachten.'
+      const note = c.injury === 'ja' ? 'Verletzung gemeldet — Belastung anpassen, ggf. auf Alternativtraining ausweichen.'
+        : c.fatigue === 'müde' ? 'Wenig erholt — Warm-up verlängern, Intensität beobachten.'
         : 'Hohe Außenbelastung — heute eher Z2 statt Z5.';
       return { complete: true, clause: bad[0] + ' laut Check-in', note, tone: 'bad' };
     }
-    const allBest = c.sleep === 'gut' && c.legs === 'frisch' && c.stress === 'ruhig';
+    const allBest = c.fatigue === 'frisch' && c.stress === 'ruhig' && c.injury === 'nein';
     return {
       complete: true,
-      clause: (c.legs === 'frisch' ? 'Beine frisch' : 'Beine ok') + ' laut Check-in',
+      clause: (c.fatigue === 'frisch' ? 'Frisch' : 'Körpergefühl ok') + ' laut Check-in',
       note: allBest ? 'Körpergefühl top — Empfehlung bestätigt.' : 'Werte solide — Empfehlung bestätigt.',
       tone: allBest ? 'good' : 'mid',
     };
@@ -58,13 +58,13 @@
   };
   function recoState(checkin, showCheckin) {
     const c = checkin || {};
-    const complete = !!(showCheckin && c.sleep && c.legs && c.stress);
+    const complete = !!(showCheckin && c.fatigue && c.stress && c.injury);
     let net = 0; const drivers = [];
     if (complete) {
-      if (c.legs === 'schwer') { net--; drivers.push('schwere Beine'); }
-      if (c.sleep === 'müde') { net--; drivers.push('wenig Schlaf'); }
+      if (c.injury === 'ja') { net--; drivers.push('eine gemeldete Verletzung'); }
+      if (c.fatigue === 'müde') { net--; drivers.push('Müdigkeit'); }
       if (c.stress === 'hoch') { net--; drivers.push('hohe Alltagsbelastung'); }
-      if (c.sleep === 'gut' && c.legs === 'frisch' && c.stress === 'ruhig') net++;
+      if (c.fatigue === 'frisch' && c.stress === 'ruhig' && c.injury === 'nein') net++;
     }
     net = Math.max(-3, Math.min(1, net));
     const p = RECO_PRESETS[String(net)];
@@ -78,13 +78,18 @@
   }
 
   function ReadinessInputs({ value, onChange, wide }) {
-    const complete = value && value.sleep && value.legs && value.stress;
+    const complete = value && value.fatigue && value.stress && value.injury;
     const set = (key, v) => {
       const next = { ...value, [key]: v };
-      if (next.sleep && next.legs && next.stress && !value.time)
+      if (next.fatigue && next.stress && next.injury && !value.time)
         next.time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       onChange(next);
     };
+    const setNote = (e) => onChange({ ...value, note: e.target.value });
+    const noteField = h('div', { className: 'col', style: { gap: 6, width: '100%' } },
+      h('span', { className: 'ff-rd-label', style: { color: 'var(--text-3)' } }, 'Persönliche Anmerkungen'),
+      h('textarea', { className: 'ff-ck-note', rows: 2, value: (value && value.note) || '',
+        placeholder: 'z. B. leichte Erkältung, Zeitmangel, Wetter …', onChange: setNote }));
     const header = h('div', { className: 'row between center' },
       h('span', { className: 'label' }, 'Wie fühlst du dich heute?'),
       complete
@@ -99,7 +104,8 @@
               h(Icon, { name: m.icon, size: 14, style: { color: 'var(--text-3)' } }),
               h('span', { className: 'ff-rd-label' }, m.label)),
             h('div', { className: 'ff-ck-opts', style: { display: 'flex', width: '100%' } }, m.opts.map((o) =>
-              h('button', { key: o.v, className: 'ff-ck-opt' + (value[m.key] === o.v ? ' on' : ''), 'data-tone': o.tone, style: { flex: 1, textAlign: 'center', padding: '7px 4px' }, onClick: () => set(m.key, o.v) }, o.label)))))));
+              h('button', { key: o.v, className: 'ff-ck-opt' + (value[m.key] === o.v ? ' on' : ''), 'data-tone': o.tone, style: { flex: 1, textAlign: 'center', padding: '7px 4px' }, onClick: () => set(m.key, o.v) }, o.label)))))),
+        noteField);
     }
     return h('div', { className: 'col', style: { gap: 9, width: '100%' } },
       header,
@@ -108,12 +114,27 @@
           h(Icon, { name: m.icon, size: 14, style: { color: 'var(--text-3)' } }),
           h('span', { className: 'ff-rd-label' }, m.label)),
         h('div', { className: 'ff-ck-opts' }, m.opts.map((o) =>
-          h('button', { key: o.v, className: 'ff-ck-opt' + (value[m.key] === o.v ? ' on' : ''), 'data-tone': o.tone, onClick: () => set(m.key, o.v) }, o.label))))));
+          h('button', { key: o.v, className: 'ff-ck-opt' + (value[m.key] === o.v ? ' on' : ''), 'data-tone': o.tone, onClick: () => set(m.key, o.v) }, o.label))))),
+      noteField);
   }
 
   /* ---------- Belastungsrisiko (ACWR) — full-width gauge under the vitals ---------- */
-  function RiskBar({ risk }) {
-    const b = risk.band, col = `var(--${b.status})`;
+  /* compact in-card empty state — used across the dashboard when a fresh account
+     has no imported activities yet, so demo numbers never leak through. */
+  function CardEmpty({ icon = 'spark', title, hint, onNav, ctaRoute, cta }) {
+    return h('div', { className: 'col center gap-10', style: { padding: '34px 18px', textAlign: 'center', flex: 1, justifyContent: 'center', minHeight: 130 } },
+      h('span', { style: { width: 46, height: 46, borderRadius: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', border: '1px solid var(--line)', color: 'var(--text-3)' } }, h(Icon, { name: icon, size: 21 })),
+      h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 700 } }, title),
+      hint && h('span', { style: { fontSize: 12.5, color: 'var(--text-3)', maxWidth: 320, lineHeight: 1.5 } }, hint),
+      cta && onNav && h('button', { className: 'btn btn--sm btn--outline', onClick: () => onNav(ctaRoute) }, cta, h(Icon, { name: 'chevR', size: 13 })));
+  }
+
+  function RiskBar({ risk, noData }) {
+    // band is null until there's enough load history (fresh/empty account) —
+    // fall back to a neutral „no data yet" state instead of crashing.
+    const b = noData ? { status: 'text-4', label: 'Noch keine Daten' }
+      : (risk.band || { status: 'text-4', label: 'Noch keine Daten' });
+    const col = `var(--${b.status})`;
     const lo = risk.gaugeLo, hi = risk.gaugeHi, span = hi - lo;
     const pos = Math.max(0, Math.min(1, (risk.acwr - lo) / span));
     const zones = [{ to: 0.8, c: 'info' }, { to: 1.3, c: 'good' }, { to: 1.5, c: 'warn' }, { to: hi, c: 'bad' }];
@@ -129,9 +150,9 @@
       h('div', { className: 'row center gap-18' },
         h('div', { className: 'col', style: { gap: 2, flexShrink: 0 } },
           h('div', { className: 'row', style: { alignItems: 'baseline', gap: 5 } },
-            h('span', { className: 'metric', style: { fontSize: 34, lineHeight: .9, color: col } }, fmt.n(risk.acwr, 2).replace('.', ',')),
+            h('span', { className: 'metric', style: { fontSize: 34, lineHeight: .9, color: col } }, noData ? '–' : fmt.n(risk.acwr, 2).replace('.', ',')),
             h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--text-4)' } }, 'ACWR')),
-          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-4)' } }, `Akut ${risk.acute} · Chron. ${risk.chronic}`)),
+          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-4)' } }, noData ? 'Noch keine Belastungsdaten' : `Akut ${risk.acute} · Chron. ${risk.chronic}`)),
         h('div', { style: { flex: 1, minWidth: 0 } },
           h('div', { className: 'ff-risk-gauge' },
             zones.map((z, i) => { const w = (z.to - prev) / span * 100; prev = z.to; return h('span', { key: i, className: 'ff-risk-zone', style: { width: w + '%', background: `color-mix(in srgb, var(--${z.c}) 44%, transparent)` } }); }),
@@ -146,17 +167,36 @@
      Drei Bereiche (gering aerob / hoch aerob / anaerob) in Minuten je Zeitraum;
      daraus wird die Verteilungsform abgeleitet (polarisiert / pyramidal / Schwelle). */
   const FOKUS_RANGES = [
-    { key: '7d',  label: '7 T',  data: { low: 320,  mid: 40,  high: 60  } },
-    { key: '14d', label: '14 T', data: { low: 610,  mid: 95,  high: 105 } },
-    { key: '4w',  label: '4 W',  data: { low: 1180, mid: 260, high: 180 } },
-    { key: '6w',  label: '6 W',  data: { low: 1650, mid: 520, high: 230 } },
-    { key: '8w',  label: '8 W',  data: { low: 2000, mid: 860, high: 280 } },
+    { key: '7d',  label: '7 T',  days: 7 },
+    { key: '14d', label: '14 T', days: 14 },
+    { key: '4w',  label: '4 W',  days: 28 },
+    { key: '6w',  label: '6 W',  days: 42 },
+    { key: '8w',  label: '8 W',  days: 56 },
   ];
   const FOKUS_BUCKETS = [
     { key: 'low',  label: 'Gering aerob', zone: 'z1', desc: 'GA1 · lockere Ausdauer' },
     { key: 'mid',  label: 'Hoch aerob',   zone: 'z4', desc: 'GA2 · Schwelle' },
     { key: 'high', label: 'Anaerob',      zone: 'z5', desc: 'VO₂max · Sprints' },
   ];
+  /* Real intensity distribution from the athlete's own activities in a time
+     window — minutes per bucket from each activity's HR-zone breakdown
+     (Z1+Z2 → base, Z3+Z4 → high-aerobic, Z5 → anaerobic). No demo fallback:
+     if there are no zone minutes in the window the card shows "Keine Angabe". */
+  function fokusFromActivities(days) {
+    const cutoff = FF.TODAY.getTime() - days * 86400000;
+    let low = 0, mid = 0, high = 0;
+    (FF.activities || []).forEach((a) => {
+      if (!a || !a.date) return;
+      const t = (a.date instanceof Date ? a.date : new Date(a.date)).getTime();
+      if (isNaN(t) || t < cutoff) return;
+      const z = Array.isArray(a.zoneMin) ? a.zoneMin : null;
+      if (!z) return;
+      low += (z[0] || 0) + (z[1] || 0);
+      mid += (z[2] || 0) + (z[3] || 0);
+      high += (z[4] || 0);
+    });
+    return { low: Math.round(low), mid: Math.round(mid), high: Math.round(high) };
+  }
   function fokusVerdict(p) { /* p = Prozentanteile {low, mid, high} */
     if (p.mid >= 25) return { t: 'Schwelle', c: 'z4',
       text: `Mit ${p.mid} % liegt ein großer Teil deiner Arbeit im hoch aeroben Bereich rund um die Schwelle — schwellenorientiertes Training. Achte auf ausreichend lockere Einheiten zur Erholung.` };
@@ -182,25 +222,40 @@
         h('div', { className: 'ff-fokus-fill', style: { width: `${w}%`, '--fc': `var(--${b.zone})` } })));
   }
 
-  function TrainingsfokusCard() {
+  function TrainingsfokusCard({ noData, onNav }) {
     const [range, setRange] = useState('7d');
+    if (noData) {
+      return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
+          info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.' },
+        h(CardEmpty, { icon: 'flame', title: 'Noch kein Trainingsfokus',
+          hint: 'Sobald du Aktivitäten importierst, zeigt sich hier deine Intensitätsverteilung.',
+          onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }));
+    }
     const r = FOKUS_RANGES.find((x) => x.key === range);
-    const total = r.data.low + r.data.mid + r.data.high;
+    const rangeTabs = h(Tabs, { items: FOKUS_RANGES.map((x) => ({ value: x.key, label: x.label })), value: range, onChange: setRange });
+    const data = fokusFromActivities(r.days);
+    const total = data.low + data.mid + data.high;
+    if (!total) {
+      return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
+          info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.', right: rangeTabs },
+        h(CardEmpty, { icon: 'flame', title: 'Keine Angabe',
+          hint: `Im gewählten Zeitraum (${r.label}) liegen keine Aktivitäten mit Zonendaten vor.` }));
+    }
     const pct = {
-      low:  Math.round(r.data.low  / total * 100),
-      mid:  Math.round(r.data.mid  / total * 100),
-      high: Math.round(r.data.high / total * 100),
+      low:  Math.round(data.low  / total * 100),
+      mid:  Math.round(data.mid  / total * 100),
+      high: Math.round(data.high / total * 100),
     };
     /* Rundungsrest auf den größten Anteil schlagen, damit die Summe 100 ergibt */
     pct.low += 100 - (pct.low + pct.mid + pct.high);
     const v = fokusVerdict(pct);
     return h(Card, { title: 'Trainingsfokus', icon: 'flame', style: { flex: 1 },
         info: 'Verteilung der Trainingszeit nach Intensitätsbereichen im gewählten Zeitraum.',
-        right: h(Tabs, { items: FOKUS_RANGES.map((x) => ({ value: x.key, label: x.label })), value: range, onChange: setRange }) },
+        right: rangeTabs },
       h('div', { className: 'col', style: { gap: 18, flex: 1, justifyContent: 'center' } },
         /* Drei Intensitätsbereiche als schlanke Verlaufs-Balken */
         h('div', { className: 'col', style: { gap: 15 } }, FOKUS_BUCKETS.map((b) =>
-          h(FokusRow, { key: b.key + range, b, pct: pct[b.key], dur: fmt.dur(r.data[b.key]) }))),
+          h(FokusRow, { key: b.key + range, b, pct: pct[b.key], dur: fmt.dur(data[b.key]) }))),
         h('div', { className: 'rule', style: { margin: 0 } }),
         /* Auswertung des Zeitraums */
         h('div', { className: 'row between center' },
@@ -336,12 +391,15 @@
     return isNaN(num) ? d.hist : d.hist.slice(0, -1).concat(num);
   }
 
-  function Vital({ id, icon, label, value, unit, base, status, spark, sparkColor, glow, pulse, pulseColor, onClick, active, valueSize = 56, manualHint }) {
+  function Vital({ id, icon, label, value, unit, base, status, spark, sparkColor, glow, pulse, pulseColor, onClick, active, valueSize = 56, manualHint, noData }) {
     const stCol = status === 'good' ? 'var(--good)' : status === 'warn' ? 'var(--warn)' : 'var(--bad)';
     const [manual, setManual] = useState(() => (id ? (loadManualVitals()[id] || null) : null));
     const [draft, setDraft] = useState('');
     const hasManual = manual != null && manual !== '';
-    const displayValue = hasManual ? manual : value;
+    // fresh account with no data yet: show a dash + manual-entry field, never the
+    // demo value/baseline/history (those belong to the sample dataset only).
+    const showData = hasManual || !noData;
+    const displayValue = hasManual ? manual : (noData ? '–' : value);
     /* manueller Wert erscheint als neuester Punkt im Verlauf */
     let displaySpark = spark;
     if (hasManual && Array.isArray(spark)) {
@@ -372,10 +430,12 @@
         h('div', { className: 'col', style: { gap: 4, marginTop: 'auto', paddingTop: 10 } },
           h('div', { className: 'row', style: { alignItems: 'baseline', gap: 5, minWidth: 0 } },
             h('span', { className: 'metric', style: { fontSize: valueSize, lineHeight: .9, letterSpacing: '-.02em' } }, displayValue),
-            h('span', { className: 'unit' }, unit)),
-          base && h('div', { className: 'row center', style: { minHeight: 22 } }, base)),
+            showData && h('span', { className: 'unit' }, unit)),
+          showData
+            ? (base && h('div', { className: 'row center', style: { minHeight: 22 } }, base))
+            : h('div', { className: 'row center', style: { minHeight: 22, fontSize: 11.5, color: 'var(--text-4)' } }, 'Keine Angabe')),
         /* full-width sparkline */
-        spark && h('div', { style: { marginTop: 10, width: '100%' } },
+        spark && showData && h('div', { style: { marginTop: 10, width: '100%' } },
           h(C.Sparkline, { data: displaySpark, w: 260, hgt: 40, color: sparkColor || 'accent', fill: true, responsive: true })),
         /* manuelles Eingabefeld — überschreibt Wert bis Mitternacht */
         id && h('div', { className: 'ff-vital-manual', onClick: stop, onMouseDown: stop, onPointerDown: stop },
@@ -410,7 +470,7 @@
   }
 
   /* ---- Form & Fitness: scrub the chart to read values at the cursor ---- */
-  function FormFitnessCard({ onNav, allowSim }) {
+  function FormFitnessCard({ onNav, allowSim, noData }) {
     const tl = FF.todayLoad;
     const [mode, setMode] = useState('history');
     const m = allowSim ? mode : 'history';
@@ -439,6 +499,12 @@
         h('span', { className: 'metric', style: { fontSize: size || (big ? 44 : 34), fontWeight: 800, lineHeight: .95, letterSpacing: '-.02em', color: color ? `var(--${color})` : 'var(--text)', transition: 'color .2s var(--ease), font-size .2s var(--ease)' } }, value)),
       h('div', { style: { fontSize: 12, height: 22, display: 'flex', alignItems: 'center', gap: 6 } }, sub));
 
+    if (noData) {
+      return h(Card, { title: 'Belastungsverh\u00e4ltnis', icon: 'diag', info: 'ATL (7\u2009Tage) vs. CTL (42\u2009Tage) ergeben die Trainingsstressbalance (TSB).' },
+        h(CardEmpty, { icon: 'diag', title: 'Noch keine Form-Daten',
+          hint: 'Fitness (CTL), Fatigue (ATL) und Form (TSB) berechnen sich aus deinen Aktivit\u00e4ten.',
+          onNav, ctaRoute: 'import', cta: 'Aktivit\u00e4ten importieren' }));
+    }
     return h(Card, { title: 'Belastungsverh\u00e4ltnis', icon: 'diag', info: 'ATL (7\u2009Tage) vs. CTL (42\u2009Tage) ergeben die Trainingsstressbalance (TSB).',
         right: h('div', { className: 'row center gap-12' },
           allowSim && h(ModeSeg, { value: m, onChange: setMode }),
@@ -486,27 +552,45 @@
             : 'Auf den Verlauf klicken, um bis zu 3 Tage zu vergleichen')));
   }
 
-  function WochenrhythmusCard() {
+  function WochenrhythmusCard({ noData, onNav }) {
     const fmt = FF.fmt;
     const [hoverDay, setHoverDay] = useState(null);
     const [pins, setPins] = useState([]); // weekday indices, placement order, max 3
+    if (noData) {
+      return h(Card, { title: 'Wochenrhythmus', icon: 'activity', className: 'ff-hero-card' },
+        h(CardEmpty, { icon: 'activity', title: 'Noch kein Wochenrhythmus',
+          hint: 'Dein wöchentliches Belastungsmuster erscheint hier, sobald Aktivitäten vorliegen.',
+          onNav, ctaRoute: 'import', cta: 'Aktivitäten importieren' }));
+    }
     const addPin = (i) => { if (i == null) return; setPins((p) => p.includes(i) ? p : (p.length >= 3 ? [...p.slice(1), i] : [...p, i])); };
     const removePin = (i) => setPins((p) => p.filter((x) => x !== i));
-    const rhythm = [3.2, 9.6, 4.8, 9.2, 3.0, 8.4, 6.1];
-    const rhythmMeta = [
-      { total: 45, activities: 1, avg: 45 },   // Mo
-      { total: 150, activities: 2, avg: 75 },  // Di
-      { total: 70, activities: 1, avg: 70 },   // Mi
-      { total: 135, activities: 2, avg: 68 },  // Do
-      { total: 40, activities: 1, avg: 40 },   // Fr
-      { total: 120, activities: 1, avg: 120 }, // Sa
-      { total: 85, activities: 1, avg: 85 },   // So
-    ];
     const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
     const dayShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    // Real weekly rhythm: minutes + activity count per weekday, from the athlete's
+    // own activities. No demo values — an empty account already returned above.
+    const rhythmMeta = dayShort.map(() => ({ total: 0, activities: 0, avg: 0 }));
+    let firstT = Infinity, lastT = -Infinity;
+    (FF.activities || []).forEach((a) => {
+      if (!a || !a.date) return;
+      const d = a.date instanceof Date ? a.date : new Date(a.date);
+      if (isNaN(d)) return;
+      const wd = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
+      rhythmMeta[wd].total += a.duration || 0;
+      rhythmMeta[wd].activities += 1;
+      const t = d.getTime(); if (t < firstT) firstT = t; if (t > lastT) lastT = t;
+    });
+    rhythmMeta.forEach((m) => { m.total = Math.round(m.total); m.avg = m.activities ? Math.round(m.total / m.activities) : 0; });
+    const maxTot = Math.max(1, ...rhythmMeta.map((m) => m.total));
+    const rhythm = rhythmMeta.map((m) => +((m.total / maxTot) * 10).toFixed(1)); // 0–10 radar scale
     const totMin = rhythmMeta.reduce((s, d) => s + d.total, 0);
     const totAct = rhythmMeta.reduce((s, d) => s + d.activities, 0);
-    const avgDur = Math.round(totMin / totAct);
+    const avgDur = totAct ? Math.round(totMin / totAct) : 0;
+    const weeksSpan = Math.max(1, Math.round((lastT - firstT) / (7 * 86400000)) || 1);
+    const perWeek = (totAct / weeksSpan);
+    // busiest 1–2 weekdays by total time
+    const activeDays = rhythmMeta.map((m, i) => ({ i, total: m.total }))
+      .filter((x) => x.total > 0).sort((a, b) => b.total - a.total).slice(0, 2)
+      .map((x) => dayShort[x.i]).join(' · ') || '–';
     const pinned = pins.length > 0;
     const hd = !pinned && hoverDay != null ? rhythmMeta[hoverDay] : null;
 
@@ -538,9 +622,9 @@
     } else {
       block = h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 } },
         hd ? cell(dayNames[hoverDay], fmt.dur(hd.total), 'Gesamtzeit')
-           : cell('Aktivste Tage', 'Di · Do', 'Qualitätseinheiten'),
+           : cell('Aktivste Tage', activeDays, 'nach Trainingszeit'),
         hd ? cell('Aktivitäten', hd.activities, hd.activities === 1 ? 'Einheit' : 'Einheiten')
-           : cell('Ø Einh. / Woche', '6,2', 'pro Woche'),
+           : cell('Ø Einh. / Woche', fmt.n(perWeek, 1), 'pro Woche'),
         hd ? cell('Ø Zeit', fmt.dur(hd.avg), 'je Einheit')
            : cell('Ø Dauer', fmt.dur(avgDur), 'je Einheit'));
     }
@@ -600,7 +684,13 @@
     const Live = window.FFLive;
     const profileDone = !!(a.age && a.height && a.weight);
     const serviceDone = !!(Live && Live.integrations && Live.integrations.some((i) => i.status === 'connected'));
-    const activitiesDone = !!(FF.activities && FF.activities.length > 0);
+    // "Aktivitäten importieren" is done as soon as ANY activities exist — whether
+    // from a manual FIT/CSV upload OR pulled in by a connected service (Strava).
+    // Read the persisted import count directly so a background sync counts even
+    // before the in-memory list has been re-hydrated.
+    const acc = (window.FFAuth && FFAuth.currentAccount) ? FFAuth.currentAccount() : null;
+    const importCount = (window.FFImports && acc) ? FFImports.count(acc) : 0;
+    const activitiesDone = importCount > 0 || !!(FF.activities && FF.activities.length > 0);
     const steps = [
       { key: 'profil', icon: 'profile', t: 'Profil vervollständigen', d: 'Alter, Größe, Gewicht & Schwellenwerte hinterlegen', done: profileDone, go: 'profil', cta: 'Profil öffnen' },
       { key: 'dienst', icon: 'link', t: 'Dienst verbinden', d: 'Strava, Garmin, Wahoo oder Apple Health', done: serviceDone, go: 'import', cta: 'Verbinden' },
@@ -633,7 +723,10 @@
                 h('div', { className: 'col gap-2', style: { flex: 1, minWidth: 0 } },
                   h('span', { className: 'strong', style: { fontSize: 15, fontWeight: 700 } }, 'Alles startklar!'),
                   h('span', { style: { fontSize: 12.5, color: 'var(--text-2)' } }, 'Dein vollständiges Dashboard steht bereit.')),
-                h('button', { className: 'btn btn--primary', onClick: () => { window.FFAuth && window.FFAuth.markOnboarded(); onOnboarded && onOnboarded(); } },
+                h('button', { className: 'btn btn--primary', onClick: () => {
+                    if (window.FFAuth) { window.FFAuth.markOnboarded(); window.FFAuth.openDashboard(); }
+                    onOnboarded && onOnboarded();
+                  } },
                   'Dashboard öffnen', h(Icon, { name: 'chevR', size: 15 })))
             : h('p', { className: 'ff-ob-hint' }, h(Icon, { name: 'info', size: 14 }),
                 h('span', null, 'Sobald alle Schritte erledigt sind, öffnet sich dein persönliches Dashboard automatisch.')))));
@@ -658,48 +751,59 @@
       { zone: 'z3', value: w.intensity.z3, label: 'Z3' }, { zone: 'z4', value: w.intensity.z4, label: 'Z4' },
       { zone: 'z5', value: w.intensity.z5, label: 'Z5' },
     ];
+    // Two independent "no data" signals so we never show fabricated numbers:
+    //  • noActivities → training-derived cards (load, risk, focus, week, activities)
+    //  • noVitals     → recovery/vitals cards, which have NO source on a real or
+    //                   Strava account (Strava doesn't deliver HRV/sleep/RHR …).
+    const noActivities = !FF.activities.length;
+    const noVitals = !FF.hasVitals;
 
     return h('div', { className: 'ff-grid', style: { gap: 18 } },
       /* ---------- HERO ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18, alignItems: 'stretch' }, 'data-hero': true },
         /* Left column: recommendation + Belastungsbalance + Trainingsfokus below it */
         h('div', { className: 'col', style: { gap: 18 } },
-          h(EmpfehlungContent, { rec, reco, view: heroView, setView: setHeroView, checkin, setCheckin, showCheckin: mods.checkin }),
-          mods.risk && h(RiskBar, { risk: FF.risk }),
-          h(TrainingsfokusCard, null)),
+          noVitals
+            ? h(Card, { title: 'Heutige Empfehlung', icon: 'spark' },
+                h(CardEmpty, { icon: 'spark', title: 'Keine Angabe',
+                  hint: 'Für die tägliche Empfehlung fehlen Erholungsdaten (HRV, Schlaf, Ruhepuls). Strava liefert diese nicht — trage sie in den Vital-Kacheln manuell ein.',
+                  onNav, ctaRoute: 'profil', cta: 'Zum Profil' }))
+            : h(EmpfehlungContent, { rec, reco, view: heroView, setView: setHeroView, checkin, setCheckin, showCheckin: mods.checkin }),
+          mods.risk && h(RiskBar, { risk: FF.risk, noData: noActivities }),
+          h(TrainingsfokusCard, { noData: noActivities, onNav })),
         /* Vitals 3x2 — Zeilen strecken sich über die volle Spaltenhöhe */
         h('div', { className: 'col', style: { gap: 18, height: '100%' } },
         h('div', { className: 'ff-grid grid-2', style: { gap: 18, gridTemplateRows: 'repeat(3, 1fr)', flex: 1, minHeight: 0 } },
-          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)',
+          h(Vital, { id: 'hrv', icon: 'heart', label: 'HRV', value: rec.hrv.val, unit: 'ms', status: rec.hrv.status, glow: 'var(--bad)', pulse: 'heart', pulseColor: 'var(--bad)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'hrv' ? 'reco' : 'hrv')), active: heroView === 'hrv',
             base: h(Delta, { value: rec.hrv.val - rec.hrv.base, unit: ' ms', suffix: ' Baseline' }),
             spark: VITAL_DATA.hrv.hist, sparkColor: VITAL_DATA.hrv.color, manualHint: 'z. B. 68' }),
-          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)',
+          h(Vital, { id: 'sleep', icon: 'moon', label: 'Schlaf', value: fmt.n(rec.sleep.val, 1), unit: 'h', status: rec.sleep.status, glow: 'var(--accent)', pulse: 'breathe', pulseColor: 'var(--accent)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'sleep' ? 'reco' : 'sleep')), active: heroView === 'sleep',
             base: h(Delta, { value: +(rec.sleep.val - 8).toFixed(1), unit: ' h', suffix: ' vs. Ziel' }),
             spark: VITAL_DATA.sleep.hist, sparkColor: VITAL_DATA.sleep.color, manualHint: 'z. B. 7,4' }),
-          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)',
+          h(Vital, { id: 'rhr', icon: 'waves', label: 'Ruhepuls', value: rec.rhr.val, unit: 'bpm', status: rec.rhr.status, glow: 'var(--warn)', pulse: 'heart', pulseColor: 'var(--warn)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'rhr' ? 'reco' : 'rhr')), active: heroView === 'rhr',
             base: h(Delta, { value: rec.rhr.val - rec.rhr.base, unit: ' bpm', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.rhr.hist, sparkColor: VITAL_DATA.rhr.color, manualHint: 'z. B. 49' }),
-          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)',
+          h(Vital, { id: 'resp', icon: 'lungs', label: 'Atemfrequenz', value: 14, unit: '/min', status: 'good', glow: 'var(--info)', pulse: 'breathe', pulseColor: 'var(--info)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'resp' ? 'reco' : 'resp')), active: heroView === 'resp',
             base: h(Delta, { value: 14 - 15, unit: ' /min', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.resp.hist, sparkColor: VITAL_DATA.resp.color, manualHint: 'z. B. 14' }),
-          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)',
+          h(Vital, { id: 'spo2', icon: 'drop', label: 'Blutsauerstoff', value: 98, unit: '%', status: 'good', glow: 'var(--good)', pulse: 'breathe', pulseColor: 'var(--good)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'spo2' ? 'reco' : 'spo2')), active: heroView === 'spo2',
             base: h(Delta, { value: 98 - 97, unit: ' %', suffix: ' Baseline' }),
             spark: VITAL_DATA.spo2.hist, sparkColor: VITAL_DATA.spo2.color, manualHint: 'z. B. 98' }),
-          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)',
+          h(Vital, { id: 'bp', icon: 'activity', label: 'Blutdruck', value: '118/76', unit: 'mmHg', valueSize: 32, status: 'good', glow: 'var(--sport-run)', pulse: 'heart', pulseColor: 'var(--sport-run)', noData: noVitals,
             onClick: () => setHeroView((v) => (v === 'bp' ? 'reco' : 'bp')), active: heroView === 'bp',
             base: h(Delta, { value: 118 - 120, unit: ' mmHg', invert: true, suffix: ' Baseline' }),
             spark: VITAL_DATA.bp.hist, sparkColor: VITAL_DATA.bp.color, manualHint: 'z. B. 118/76' })))),
 
       /* ---------- FORM / FITNESS ROW ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
-        h(FormFitnessCard, { onNav, allowSim: mods.sim }),
+        h(FormFitnessCard, { onNav, allowSim: mods.sim, noData: noActivities }),
         /* Weekly rhythm */
-        h(WochenrhythmusCard, null)),
+        h(WochenrhythmusCard, { noData: noActivities, onNav })),
 
       /* ---------- WEEKLY GOALS + ACTIVITIES ---------- */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 18 }, 'data-dash': true },
@@ -722,7 +826,12 @@
         h(Card, { title: 'Letzte Einheiten', icon: 'activity', pad: false,
           right: h('button', { className: 'btn btn--sm btn--ghost', onClick: () => onNav('diag') }, 'Alle') },
           h('div', { className: 'col', style: { padding: '4px 10px 10px' } },
-            FF.activities.slice(0, 5).map((a) => h(ActivityRow, { key: a.id, a, onClick: () => onOpenActivity(a.id) }))))));
+            FF.activities.length
+              ? FF.activities.slice(0, 5).map((a) => h(ActivityRow, { key: a.id, a, onClick: () => onOpenActivity(a.id) }))
+              : h('div', { className: 'col center gap-8', style: { padding: '28px 10px', textAlign: 'center', color: 'var(--text-3)' } },
+                  h(Icon, { name: 'activity', size: 22 }),
+                  h('span', { style: { fontSize: 13 } }, 'Noch keine Aktivitäten'),
+                  h('button', { className: 'btn btn--sm btn--outline', onClick: () => onNav('import') }, 'Aktivitäten importieren', h(Icon, { name: 'chevR', size: 13 })))))));
   }
 
   function LoadBar({ band, lo, hi, fillTo = 73, height = 100, colors = ['var(--z3)', 'var(--z4)', 'var(--z5)'] }) {
@@ -964,9 +1073,9 @@
           h('span', null, '·'), h('span', { className: 'mono' }, FF.fmt.dur(a.duration)),
           a.distance && h(Fragment, null, h('span', null, '·'), h('span', { className: 'mono' }, `${FF.fmt.n(a.distance, 1)} km`)))),
       h('div', { className: 'col', style: { alignItems: 'flex-end', gap: 4, flexShrink: 0 } },
-        h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss),
+        h('span', { className: 'mono strong', style: { fontSize: 14 } }, a.tss != null ? a.tss : '–'),
         h('span', { className: 'label', style: { fontSize: 8.5 } }, 'TSS')),
-      h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
+      a.rpe != null && h('span', { className: 'chip', style: { height: 22, fontSize: 10, color: `var(--${intCol})`, flexShrink: 0, whiteSpace: 'nowrap' } }, h('span', { className: 'dot', style: { background: `var(--${intCol})` } }), `RPE ${a.rpe}`));
   }
 
   window.Screens = window.Screens || {};

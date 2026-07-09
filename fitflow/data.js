@@ -315,21 +315,25 @@
     if (!sport) sport = /run|lauf|\.gpx/.test(name) ? 'run' : /kraft|lift|strength|\.csv/.test(name) ? 'lift' : /bike|rad|ride|vo2|ftp|\.fit/.test(name) ? 'bike' : pick(['bike', 'run', 'lift']);
     const date = opts.date || TODAY;
     const base = { sport, date, imported: true, fileName: opts.fileName || null };
+    // fall back to sane defaults when the athlete profile is still blank (real,
+    // freshly-onboarded accounts have no FTP/maxHR yet) — avoids /0 and NaN.
+    const FTP = Number(athlete.ftp) || 240;
+    const MAXHR = Number(athlete.maxHr) || 190;
 
     if (sport === 'bike') {
       const dur = 45 + Math.round(rr() * 95);
       const avgPower = 150 + Math.round(rr() * 80);
-      const iF = avgPower / athlete.ftp;
+      const iF = avgPower / FTP;
       const np = avgPower + 6 + Math.round(rr() * 22);
       const dist = +(dur / 60 * (27 + rr() * 13)).toFixed(1);
-      const avgHr = Math.min(athlete.maxHr - 8, 128 + Math.round(iF * 38) + Math.round(rr() * 6));
+      const avgHr = Math.min(MAXHR - 8, 128 + Math.round(iF * 38) + Math.round(rr() * 6));
       const tss = Math.max(18, Math.round(dur / 60 * iF * iF * 100));
       const hard = iF > 0.82;
       return mkActivity({ ...base, title: opts.title || (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt'),
         duration: dur, distance: dist, elevation: Math.round(dist * 8 + rr() * 220),
         calories: Math.round(dur * 11 + rr() * 140), tss, rpe: Math.min(10, Math.max(2, Math.round(tss / 13))),
         avgPower, maxPower: np + 190 + Math.round(rr() * 260), np,
-        avgHr, maxHr: Math.min(athlete.maxHr, avgHr + 16 + Math.round(rr() * 12)),
+        avgHr, maxHr: Math.min(MAXHR, avgHr + 16 + Math.round(rr() * 12)),
         avgCad: 84 + Math.round(rr() * 10), maxCad: 106 + Math.round(rr() * 10),
         intensity: hard ? 'Hard' : 'Tempo', zoneMin: zoneDist(dur, hard ? [14, 22, 10, 12, 16] : [16, 42, 18, 6, 2]),
         ai: 'Automatisch aus der importierten FIT-Datei rekonstruiert — Telemetrie, Zonenverteilung und TSS wurden FitFlow-seitig berechnet.',
@@ -349,7 +353,7 @@
       return mkActivity({ ...base, title: opts.title || (hard ? 'Tempolauf' : 'Dauerlauf'),
         duration: dur, distance: dist, elevation: Math.round(dist * 7 + rr() * 60),
         calories: Math.round(dur * 13 + rr() * 90), tss, rpe: Math.min(10, Math.max(2, Math.round(tss / 11))),
-        avgHr, maxHr: Math.min(athlete.maxHr, avgHr + 16 + Math.round(rr() * 10)),
+        avgHr, maxHr: Math.min(MAXHR, avgHr + 16 + Math.round(rr() * 10)),
         avgCad: 176 + Math.round(rr() * 8), maxCad: 188 + Math.round(rr() * 8), avgPace: pace,
         intensity: hard ? 'Hard' : 'Easy', zoneMin: zoneDist(dur, hard ? [8, 16, 10, 20, 4] : [16, 30, 6, 2, 0]),
         ai: 'Automatisch aus der importierten Datei rekonstruiert — Pace-, HF- und Kadenzstreams sowie TSS wurden FitFlow-seitig berechnet.',
@@ -465,6 +469,204 @@
     { name: 'kraft_unterkoerper.csv', size: '34\u2009KB', status: 'done', sport: 'lift', rows: '28 Sätze' },
   ];
 
+  /* Build a real activity from a parsed FIT/CSV summary (window.FitParser).
+     Everything here is derived from the actual file — duration, distance,
+     HR/power/cadence aggregates, TSS, zone split and the telemetry streams
+     are computed, not fabricated. Falls back sensibly when a field is absent. */
+  function buildActivityFromFit(p, opts) {
+    opts = opts || {};
+    const fname = opts.fileName || p.fileName || null;
+
+    // sport: parser guess → filename hint → stream-based inference
+    let sport = p.sport;
+    if (!sport) {
+      const name = (fname || '').toLowerCase();
+      sport = /run|lauf/.test(name) ? 'run'
+        : /kraft|lift|strength|\.csv/.test(name) ? 'lift'
+        : p.avgPower ? 'bike' : (p.avgSpeed || p.distance) ? 'run' : 'lift';
+    }
+
+    const durMin = Math.max(1, Math.round((p.duration || 0) / 60) || 1);
+    const durH = durMin / 60;
+    const distKm = p.distance != null ? +(p.distance / 1000).toFixed(1) : null;
+
+    // intensity factor + TSS: power-based for bike, HR-based otherwise. ONLY from
+    // real signals — no duration guess. Without power+FTP or HR+threshold-HR, tss
+    // stays null → "Keine Angabe".
+    let tss = null, iF = null;
+    const npOrAvg = p.np || p.avgPower;
+    if (npOrAvg && athlete.ftp) {
+      iF = npOrAvg / athlete.ftp;
+      tss = Math.max(1, Math.round(durH * iF * iF * 100));
+    } else if (p.avgHr && athlete.thrHr) {
+      const hrIf = p.avgHr / athlete.thrHr;
+      tss = Math.max(1, Math.round(durH * hrIf * hrIf * 100));
+    }
+
+    // avg pace (s/km) for running
+    let avgPace = null;
+    const spd = p.avgSpeed || (p.distance && p.duration ? p.distance / p.duration : null);
+    if (sport === 'run' && spd) avgPace = Math.round(1000 / spd);
+
+    // zone minutes: bucket the REAL HR stream against the athlete's zones; else a
+    // power-based split (real iF). No HR stream and no power → null ("Keine Angabe"),
+    // never a default guess distribution.
+    const hrStream = p.records ? p.records.map((r) => r.hr).filter((v) => v != null) : [];
+    let zoneMin = null;
+    if (hrStream.length > 8 && athlete.thrHr) {
+      const buckets = [0, 0, 0, 0, 0];
+      hrStream.forEach((hr) => {
+        const frac = hr / athlete.thrHr;
+        let zi = hrZones.findIndex((z) => frac < z.hi);
+        if (zi < 0) zi = 4;
+        buckets[zi]++;
+      });
+      const tot = hrStream.length;
+      zoneMin = buckets.map((c) => Math.round((c / tot) * durMin));
+    } else if (iF != null) {
+      const w = iF > 0.9 ? [10, 20, 12, 10, 12] : iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
+      zoneMin = zoneDist(durMin, w);
+    }
+
+    // downsample any per-record channel to 60 points for the charts
+    const down = (key) => {
+      const src = p.records ? p.records.map((r) => r[key]) : [];
+      const clean = src.filter((v) => v != null);
+      if (clean.length < 4) return null;
+      const out = [];
+      for (let i = 0; i < 60; i++) {
+        const a = Math.floor((i / 60) * clean.length), b = Math.max(a + 1, Math.floor(((i + 1) / 60) * clean.length));
+        let s = 0, n = 0; for (let k = a; k < b && k < clean.length; k++) { s += clean[k]; n++; }
+        out.push(n ? Math.round(s / n) : clean[Math.min(a, clean.length - 1)]);
+      }
+      return out;
+    };
+    const paceStream = () => {
+      const src = p.records ? p.records.map((r) => (r.speed ? 1000 / r.speed : null)) : [];
+      const clean = src.filter((v) => v != null && isFinite(v) && v < 900);
+      if (clean.length < 4) return null;
+      const out = [];
+      for (let i = 0; i < 60; i++) {
+        const a = Math.floor((i / 60) * clean.length), b = Math.max(a + 1, Math.floor(((i + 1) / 60) * clean.length));
+        let s = 0, n = 0; for (let k = a; k < b && k < clean.length; k++) { s += clean[k]; n++; }
+        out.push(n ? Math.round(s / n) : clean[Math.min(a, clean.length - 1)]);
+      }
+      return out;
+    };
+
+    const streams = {};
+    const hrDown = down('hr'); if (hrDown) streams.hr = hrDown;
+    if (sport === 'run') { const pc = paceStream(); if (pc) streams.pace = pc; }
+    else { const pw = down('power'); if (pw) streams.power = pw; }
+    const cad = down('cadence'); if (cad) streams.cadence = cad;
+
+    // intensity label only from a real basis (power / pace vs. threshold); else null
+    let intensity = null;
+    if (iF != null) intensity = iF > 0.9 ? 'Hard' : iF > 0.75 ? 'Tempo' : 'Easy';
+    else if (avgPace && athlete.runThrPace) intensity = avgPace < athlete.runThrPace ? 'Hard' : 'Easy';
+    const hard = intensity === 'Hard';
+    const title = opts.title
+      || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
+        : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
+
+    const date = p.startTime instanceof Date && !isNaN(p.startTime) ? p.startTime : (opts.date || TODAY);
+
+    return mkActivity({
+      sport, title, date, imported: true, fileName: fname,
+      duration: durMin, distance: distKm,
+      elevation: p.elevation != null ? p.elevation : null,
+      calories: p.calories != null ? p.calories : null,
+      tss, rpe: tss != null ? Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))) : null,
+      avgPower: p.avgPower || null, maxPower: p.maxPower || null, np: p.np || null,
+      avgHr: p.avgHr || null, maxHr: p.maxHr || null,
+      avgCad: p.avgCad || null, maxCad: p.maxCad || null, avgPace,
+      intensity, zoneMin,
+      ai: 'Aus deiner echten ' + (fname && /\.csv$/i.test(fname) ? 'CSV' : 'FIT') + '-Datei eingelesen — Dauer, '
+        + 'Distanz, HF/Power/Kadenz, Zonenverteilung und TSS wurden direkt aus den Messwerten berechnet.',
+      streams: Object.keys(streams).length ? streams : undefined,
+    });
+  }
+
+  /* Build a real activity from a Strava activity summary (the normalised object
+     the strava Edge Function returns). Everything is derived from Strava's own
+     numbers — duration, distance, HR/power, elevation and TSS. TSS prefers
+     power (needs FTP), then HR (needs threshold HR), then Strava's Relative
+     Effort (suffer_score), then a duration estimate, so it still yields an
+     honest value when the athlete profile has no performance values yet. */
+  function buildActivityFromStrava(s, opts) {
+    opts = opts || {};
+    const type = String(s.type || '').toLowerCase();
+    let sport = /ride|cycl|bike|velomobile|handcycle|ebike/.test(type) ? 'bike'
+      : /run|walk|hike/.test(type) ? 'run'
+      : /weight|workout|crossfit|strength/.test(type) ? 'lift'
+      : (s.average_watts ? 'bike' : (s.distance ? 'run' : 'lift'));
+
+    const durMin = Math.max(1, Math.round((s.moving_time || s.elapsed_time || 0) / 60) || 1);
+    const durH = durMin / 60;
+    const distKm = s.distance != null ? +(s.distance / 1000).toFixed(1) : null;
+    const np = s.weighted_average_watts || null;
+    const avgPower = s.average_watts || null;
+    const avgHr = s.average_heartrate ? Math.round(s.average_heartrate) : null;
+    const maxHr = s.max_heartrate ? Math.round(s.max_heartrate) : null;
+    const FTP = Number(athlete.ftp) || 0;
+    const THR = Number(athlete.thrHr) || 0;
+
+    // Training-Load (TSS) ONLY from real signals: power+FTP, HR+threshold-HR, or
+    // Strava's own Relative Effort (suffer_score). No duration guess — if none of
+    // these exist, tss stays null → "Keine Angabe".
+    let tss = null, iF = null;
+    const powerRef = np || avgPower;
+    if (powerRef && FTP) { iF = powerRef / FTP; tss = Math.max(1, Math.round(durH * iF * iF * 100)); }
+    else if (avgHr && THR) { const hr = avgHr / THR; tss = Math.max(1, Math.round(durH * hr * hr * 100)); }
+    else if (s.suffer_score) { tss = Math.max(1, Math.round(s.suffer_score)); }
+
+    let avgPace = null;
+    const spd = s.average_speed || (s.distance && s.moving_time ? s.distance / s.moving_time : null);
+    if (sport === 'run' && spd) avgPace = Math.round(1000 / spd);
+
+    // Zone minutes ONLY from a real intensity signal (HR or power). Never a default
+    // guess distribution — otherwise null ("Keine Angabe").
+    let zoneMin = null;
+    if (avgHr && THR) {
+      const frac = avgHr / THR;
+      const w = frac > 0.98 ? [6, 14, 14, 16, 10] : frac > 0.9 ? [10, 24, 14, 8, 4] : frac > 0.82 ? [16, 34, 8, 2, 0] : [26, 26, 4, 0, 0];
+      zoneMin = zoneDist(durMin, w);
+    } else if (iF != null) {
+      const w = iF > 0.9 ? [10, 20, 12, 10, 12] : iF > 0.75 ? [16, 34, 12, 6, 2] : [22, 30, 6, 2, 0];
+      zoneMin = zoneDist(durMin, w);
+    }
+
+    // Intensity label only from a real basis (power / pace vs. threshold / Relative
+    // Effort); otherwise null ("Keine Angabe").
+    let intensity = null;
+    if (iF != null) intensity = iF > 0.9 ? 'Hard' : iF > 0.75 ? 'Tempo' : 'Easy';
+    else if (avgPace && athlete.runThrPace) intensity = avgPace < athlete.runThrPace ? 'Hard' : 'Easy';
+    else if (s.suffer_score) intensity = s.suffer_score > 80 ? 'Hard' : 'Tempo';
+    const hard = intensity === 'Hard';
+    // RPE is derived from TSS — no TSS, no honest RPE.
+    const rpe = tss != null ? Math.min(10, Math.max(2, Math.round(tss / (sport === 'lift' ? 6 : 12)))) : null;
+
+    const title = s.name || (sport === 'bike' ? (hard ? 'Intervall-Einheit' : 'Ausdauerfahrt')
+      : sport === 'run' ? (hard ? 'Tempolauf' : 'Dauerlauf') : 'Krafttraining');
+    const date = s.start_date ? new Date(s.start_date) : (opts.date || TODAY);
+    // Only real Strava figures — Strava's own calories, or kilojoules (≈ kcal for
+    // cycling). If it delivers neither, leave it empty ("keine Angabe") rather than
+    // inventing a duration-based estimate.
+    const calories = s.calories || (s.kilojoules ? Math.round(s.kilojoules) : null);
+
+    return mkActivity({
+      sport, title, date, imported: true,
+      duration: durMin, distance: distKm,
+      elevation: s.total_elevation_gain != null ? Math.round(s.total_elevation_gain) : null,
+      calories, tss, rpe,
+      avgPower, maxPower: s.max_watts || null, np,
+      avgHr, maxHr,
+      avgCad: s.average_cadence ? Math.round(s.average_cadence * (sport === 'run' ? 2 : 1)) : null, maxCad: null, avgPace,
+      intensity, zoneMin,
+      ai: 'Automatisch von Strava synchronisiert — Dauer, Distanz, HF/Power, Höhenmeter und TSS stammen aus deinen Strava-Aktivitätsdaten.',
+    });
+  }
+
   window.FF = {
     fmt, TODAY, addDays,
     athlete, hrZones, powerZones,
@@ -474,7 +676,7 @@
     activities, sportMeta, week,
     annual, months, planner,
     integrations, recentImports,
-    buildImportedActivity, notifications,
+    buildImportedActivity, buildActivityFromFit, buildActivityFromStrava, notifications,
     zoneColors: ['z1', 'z2', 'z3', 'z4', 'z5'],
   };
 })();

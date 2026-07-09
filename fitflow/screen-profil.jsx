@@ -57,7 +57,7 @@
       /* row 1: Athletenprofil + Konto */
       h('div', { className: 'ff-grid', style: { gridTemplateColumns: '1fr 1fr', gap: 18, alignItems: 'stretch' } },
         h(Card, { title: 'Athletenprofil', icon: 'profile' },
-          h('div', { className: 'row center gap-16', style: { marginBottom: 20 } },
+          h('div', { className: 'row center gap-16', style: { paddingBottom: 18, marginBottom: 16, borderBottom: '1px solid var(--line-soft)' } },
             h('div', { style: { position: 'relative' } },
               avatar
                 ? h('img', { src: avatar, style: { width: 72, height: 72, borderRadius: 16, objectFit: 'cover', border: '1px solid var(--line-2)' } })
@@ -66,8 +66,7 @@
               h('input', { ref: fileRef, type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: onAvatar })),
             h('div', { className: 'col gap-3' },
               h('span', { className: 'h3', style: { fontSize: 18 } }, p.name),
-              h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, a.role),
-              h('span', { className: 'chip chip--solid', style: { marginTop: 4, alignSelf: 'flex-start' } }, h(Icon, { name: 'spark', size: 12 }), `FitFlow ${a.plan}`))),
+              h('span', { style: { fontSize: 12.5, color: 'var(--text-3)' } }, a.role))),
           h('div', { className: 'col gap-12' },
             h(Field, { label: 'Profilname' }, h('input', { className: 'ff-input', value: p.name, onChange: (e) => setP({ ...p, name: e.target.value }) })),
             h('div', { className: 'ff-grid grid-3', style: { gap: 12 } },
@@ -103,7 +102,7 @@
 
       /* row 4: Leistungskennzahlen über die gesamte Breite */
       h(Card, { title: 'Leistungskennzahlen', icon: 'gauge' },
-        h('div', { className: 'ff-grid', style: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 } },
+        h('div', { className: 'ff-grid grid-4', style: { gap: 16 } },
           h(KStat, { label: 'BMI', value: bmi }),
           h(KStat, { label: 'VO₂max', value: empty ? '—' : fmt.n(a.vo2max, 1), unit: 'ml/min/kg', color: 'good' }),
           h(KStat, { label: 'FTP / kg', value: wkg, unit: 'W/kg', color: 'sport-bike' }),
@@ -157,60 +156,80 @@
     });
   }
 
-  /* miniature live preview of each backdrop mode, recoloured to `color` */
-  function BgPreview({ mode, color }) {
+  /* miniature live preview of each backdrop mode, recoloured to `color`
+     (color 'rainbow' spreads the engine's spectrum + slow hue cycle) */
+  function BgPreview({ mode, color, vid }) {
     const B = window.FFBackground;
+    const RB = (B && B.RAINBOW) || ['#ff4d4d', '#ffb13d', '#35d073', '#38b6ff', '#7C5CFF', '#ff4fd8'];
+    const rainbow = color === 'rainbow';
+    const cAt = (i) => (rainbow ? RB[i % RB.length] : color);
+    const anim = rainbow ? { animation: 'ff-hue-cycle 24s linear infinite' } : null;
     if (mode === 'etheral') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('div', { style: { position: 'absolute', inset: '-22%', filter: 'blur(7px)',
           background:
-            `radial-gradient(44% 54% at 30% 32%, ${bgRgba(color, 0.95)} 0%, transparent 66%),` +
-            `radial-gradient(50% 60% at 72% 66%, ${bgRgba(color, 0.7)} 0%, transparent 70%),` +
-            `radial-gradient(54% 58% at 58% 14%, ${bgRgba(color, 0.5)} 0%, transparent 74%)` } }));
+            `radial-gradient(44% 54% at 30% 32%, ${bgRgba(cAt(0), 0.95)} 0%, transparent 66%),` +
+            `radial-gradient(50% 60% at 72% 66%, ${bgRgba(cAt(1), 0.7)} 0%, transparent 70%),` +
+            `radial-gradient(54% 58% at 58% 14%, ${bgRgba(cAt(2), 0.5)} 0%, transparent 74%)` } }));
     }
     if (mode === 'beams') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('div', { style: { position: 'absolute', inset: 0,
           backgroundImage:
-            `linear-gradient(118deg, transparent 26%, ${bgRgba(color, 0.62)} 40%, transparent 50%),` +
-            `linear-gradient(118deg, transparent 50%, ${bgRgba(color, 0.46)} 62%, transparent 72%),` +
-            `linear-gradient(118deg, transparent 6%, ${bgRgba(color, 0.34)} 16%, transparent 24%)` } }));
+            `linear-gradient(118deg, transparent 26%, ${bgRgba(cAt(0), 0.62)} 40%, transparent 50%),` +
+            `linear-gradient(118deg, transparent 50%, ${bgRgba(cAt(1), 0.46)} 62%, transparent 72%),` +
+            `linear-gradient(118deg, transparent 6%, ${bgRgba(cAt(2), 0.34)} 16%, transparent 24%)` } }));
     }
     if (mode === 'bars') {
       const hs = [1, 0.78, 0.55, 0.4, 0.3, 0.4, 0.55, 0.78, 1];
-      return h('div', { className: 'ff-bgprev', style: { display: 'flex', alignItems: 'flex-end', gap: 2, padding: '0 5px' } },
+      return h('div', { className: 'ff-bgprev', style: Object.assign({ display: 'flex', alignItems: 'flex-end', gap: 2, padding: '0 5px' }, anim) },
         hs.map((hh, i) => h('div', { key: i, style: { flex: 1, height: (hh * 100) + '%', borderRadius: '2px 2px 0 0',
-          background: `linear-gradient(to top, ${bgRgba(color, 0.95)}, ${bgRgba(color, 0)})` } })));
+          background: `linear-gradient(to top, ${bgRgba(cAt(i), 0.95)}, ${bgRgba(cAt(i), 0)})` } })));
     }
     if (mode === 'paths') {
-      return h('div', { className: 'ff-bgprev' },
+      return h('div', { className: 'ff-bgprev', style: anim },
         h('svg', { viewBox: '0 0 100 64', preserveAspectRatio: 'none', style: { position: 'absolute', inset: 0, width: '100%', height: '100%' } },
           [0, 1, 2, 3, 4, 5].map((i) => h('path', { key: i,
             d: `M-8 ${64 - i * 8} C 22 ${48 - i * 7}, 48 ${10 + i * 5}, 108 ${30 - i * 9}`,
-            fill: 'none', stroke: color, strokeWidth: 0.8 + i * 0.12, strokeOpacity: 0.28 + i * 0.11 }))));
+            fill: 'none', stroke: cAt(i), strokeWidth: 0.8 + i * 0.12, strokeOpacity: 0.28 + i * 0.11 }))));
+    }
+    if (mode === 'video') {
+      const list = (B && B.VIDEOS) || [];
+      const v = list.find((x) => x.id === vid) || list[0];
+      return h('div', { className: 'ff-bgprev' },
+        v && h('video', { src: v.url, muted: true, loop: true, autoPlay: true, playsInline: true,
+          ref: (el) => { if (el) { el.muted = true; const p = el.play && el.play(); if (p && p.catch) p.catch(() => {}); } },
+          style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } }));
     }
     // photo — reflects a custom uploaded image when present
     const url = (B && B.get().photo) || (B && B.PHOTO_URL);
     return h('div', { className: 'ff-bgprev', style: { background: `#0a0d14 url("${url}") center / cover no-repeat` } });
   }
 
-  function BgTile({ mode, label, active, color, onSelect }) {
+  function BgTile({ mode, label, active, color, vid, onSelect }) {
     return h('button', { className: 'ff-bgtile' + (active ? ' is-active' : ''), onClick: onSelect, type: 'button' },
-      h(BgPreview, { mode, color }),
-      active && h('span', { className: 'ff-bgtile-check' }, h(Icon, { name: 'check', size: 12 })),
+      h('span', { className: 'ff-bgtile-shot' },
+        h(BgPreview, { mode, color, vid }),
+        h('span', { className: 'ff-bgprev-ui', 'aria-hidden': true })),
       h('span', { className: 'ff-bgtile-label' }, label));
   }
 
   function ColorSwatches({ value, options, onChange }) {
     const lc = String(value).toLowerCase();
-    const preset = options.some((c) => c.toLowerCase() === lc);
+    const all = options.concat(['rainbow']);   // Spektrum als kuratierte Option
+    const preset = all.some((c) => c.toLowerCase() === lc);
+    const hex = /^#/.test(String(value)) ? value : '#7C5CFF';   // <input type=color> braucht Hex
     return h('div', { className: 'ff-swatches' },
-      options.map((c) => h('button', { key: c, type: 'button',
-        className: 'ff-swatch' + (c.toLowerCase() === lc ? ' is-active' : ''),
-        style: { '--sw': c }, onClick: () => onChange(c), title: c })),
-      h('label', { className: 'ff-swatch ff-swatch--custom' + (!preset ? ' is-active' : ''), style: { '--sw': value }, title: 'Eigene Farbe' },
+      all.map((c) => {
+        const rb = c === 'rainbow';
+        return h('button', { key: c, type: 'button',
+          className: 'ff-swatch' + (rb ? ' ff-swatch--rainbow' : '') + (c.toLowerCase() === lc ? ' is-active' : ''),
+          style: rb ? undefined : { '--sw': c }, onClick: () => onChange(c),
+          title: rb ? 'Regenbogen' : c, 'aria-label': rb ? 'Regenbogen-Spektrum' : c });
+      }),
+      h('label', { className: 'ff-swatch ff-swatch--custom' + (!preset ? ' is-active' : ''), style: { '--sw': hex }, title: 'Eigene Farbe' },
         h(Icon, { name: 'plus', size: 13, style: { color: '#fff', position: 'relative', zIndex: 1, mixBlendMode: 'difference' } }),
-        h('input', { type: 'color', value, onChange: (e) => onChange(e.target.value) })));
+        h('input', { type: 'color', value: hex, onChange: (e) => onChange(e.target.value) })));
   }
 
   function PhotoImport({ photo, onFile, onReset }) {
@@ -247,52 +266,56 @@
     const upd = (k) => (v) => G.set({ [k]: v });
     const setBg = (k) => (v) => B.set({ [k]: v });
     const onPhoto = (file) => { fileToScaledDataURL(file).then((data) => B.set({ photo: data, mode: 'photo', photoScale: 1, photoX: 50, photoY: 50 })).catch(() => {}); };
-    const MODES = [
-      { id: 'etheral', label: 'Nebel' },
-      { id: 'beams', label: 'Strahlen' },
-      { id: 'bars', label: 'Balken' },
-      { id: 'paths', label: 'Pfade' },
-      { id: 'photo', label: 'Foto' },
+    const SCENES = [
+      { mode: 'etheral', label: 'Nebel' },
+      { mode: 'beams', label: 'Strahlen' },
+      { mode: 'bars', label: 'Balken' },
+      { mode: 'paths', label: 'Pfade' },
+      { mode: 'video', vid: 1, label: 'Animation 1' },
+      { mode: 'video', vid: 2, label: 'Animation 2' },
+      { mode: 'video', vid: 3, label: 'Animation 3' },
+      { mode: 'video', vid: 4, label: 'Animation 4' },
+      { mode: 'photo', label: 'Foto' },
     ];
     const COLORS = ((B && B.PRESETS) || []).map((p) => p.color);
 
     return h('div', { className: 'ff-grid', style: { gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }, 'data-prof': true },
-      /* ---- Hintergrund (full width) ---- */
+      /* ---- Hintergrund (volle Breite) ---- */
       B && b && h('div', { style: { gridColumn: '1 / -1' } },
         h(Card, { title: 'Hintergrund', icon: 'image', info: 'Wähle eine Szene und Farbe — live hinter allen Glas-Kästchen in jedem Reiter.' },
-          h('div', { className: 'ff-bgtiles' },
-            MODES.map((m) => h(BgTile, { key: m.id, mode: m.id, label: m.label, active: b.mode === m.id, color: b.color, onSelect: () => setBg('mode')(m.id) }))),
-          b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
-          b.mode === 'photo' && h('div', { className: 'ff-bg-sliders', style: { marginTop: 16 } },
-            h(GSlider, { label: 'Größe', value: Math.round(b.photoScale * 100), min: 100, max: 300, format: (v) => v + '%', hint: 'Foto vergrößern – zoomt in den Bildausschnitt', onChange: (v) => setBg('photoScale')(v / 100) }),
-            h(GSlider, { label: 'Ausschnitt horizontal', value: b.photoX, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach links / rechts schieben', onChange: setBg('photoX') }),
-            h(GSlider, { label: 'Ausschnitt vertikal', value: b.photoY, min: 0, max: 100, format: (v) => v + '%', hint: 'Sichtbaren Bereich nach oben / unten schieben', onChange: setBg('photoY') })),
-          h('div', { className: 'ff-bg-controls' + (b.mode === 'photo' ? ' ff-bg-controls--solo' : '') },
-            b.mode !== 'photo' && h('div', { className: 'col gap-10' },
-              h('span', { className: 'label', style: { display: 'flex', alignItems: 'center', gap: 7 } }, h(Icon, { name: 'palette', size: 14, style: { color: 'var(--text-3)' } }), 'Farbe'),
-              h(ColorSwatches, { value: b.color, options: COLORS, onChange: setBg('color') })),
-            h('div', { className: 'ff-bg-sliders' },
-              h(GSlider, { label: 'Stärke', value: b.intensity, min: 30, max: 100, format: (v) => v + '%', hint: 'Gesamtintensität des Hintergrunds', onChange: setBg('intensity') }),
-              b.mode === 'bars' && h(GSlider, { label: 'Balkenanzahl', value: b.bars, min: 5, max: 28, format: (v) => v, hint: 'Anzahl der animierten Balken', onChange: setBg('bars') }))))),
+        h('div', { className: 'ff-bgtiles' },
+          SCENES.map((sc) => h(BgTile, { key: sc.mode + (sc.vid || ''), mode: sc.mode, vid: sc.vid, label: sc.label,
+            active: b.mode === sc.mode && (sc.vid == null || b.video === sc.vid), color: b.color,
+            onSelect: () => B.set(sc.vid != null ? { mode: sc.mode, video: sc.vid } : { mode: sc.mode }) }))),
+        b.mode === 'photo' && h(PhotoImport, { photo: b.photo, onFile: onPhoto, onReset: () => B.set({ photo: null, photoScale: 1, photoX: 50, photoY: 50 }) }),
+        h('div', { className: 'ff-bg-controls' },
+          b.mode !== 'photo' && b.mode !== 'video' && h('div', { className: 'ff-bg-colorrow' },
+            h('span', { className: 'ff-gs-label' }, 'Farbe'),
+            h(ColorSwatches, { value: b.color, options: COLORS, onChange: setBg('color') })),
+          h('div', { className: 'ff-gs-stack' },
+            h(GSlider, { label: 'Stärke', value: b.intensity, min: 30, max: 100, format: (v) => v + '%', onChange: setBg('intensity') }),
+            b.mode === 'bars' && h(GSlider, { key: 'bars', label: 'Balkenanzahl', value: b.bars, min: 5, max: 28, format: (v) => v, onChange: setBg('bars') }),
+            b.mode === 'photo' && h(GSlider, { key: 'ps', label: 'Größe', value: Math.round(b.photoScale * 100), min: 100, max: 300, format: (v) => v + '%', onChange: (v) => setBg('photoScale')(v / 100) }),
+            b.mode === 'photo' && h(GSlider, { key: 'px', label: 'Ausschnitt horizontal', value: b.photoX, min: 0, max: 100, format: (v) => v + '%', onChange: setBg('photoX') }),
+            b.mode === 'photo' && h(GSlider, { key: 'py', label: 'Ausschnitt vertikal', value: b.photoY, min: 0, max: 100, format: (v) => v + '%', onChange: setBg('photoY') }))))),
 
       /* ---- Material ---- */
-      h('div', { className: 'col gap-18' },
-        h(Card, { title: 'Material', icon: 'layers', info: 'Tönung und Unschärfe des Glases — live auf alle Kästchen angewendet.' },
-          h('div', { className: 'ff-gs-stack' },
-            h(GSlider, { label: 'Deckkraft', value: s.opacity, min: 0, max: 55, format: (v) => v + '%', hint: 'Einfärbung / Transparenz der Kästchen', onChange: upd('opacity') }),
-            h(GSlider, { label: 'Unschärfe', value: s.blur, min: 0, max: 30, format: (v) => v + 'px', hint: 'Intensität der Hintergrund-Unschärfe', onChange: upd('blur') }),
-            h(GSlider, { label: 'Sättigung', value: s.sat, min: 100, max: 220, format: (v) => v + '%', hint: 'Farbsättigung des Hintergrunds', onChange: upd('sat') }),
-            h(GSlider, { label: 'Helligkeit', value: s.bright, min: 80, max: 140, format: (v) => v + '%', hint: 'Lichtdurchlässigkeit des Materials', onChange: upd('bright') })))),
+      h(Card, { title: 'Material', icon: 'layers', info: 'Tönung und Unschärfe des Glases — live auf alle Kästchen angewendet.' },
+        h('div', { className: 'ff-gs-stack' },
+          h(GSlider, { label: 'Deckkraft', value: s.opacity, min: 0, max: 55, format: (v) => v + '%', onChange: upd('opacity') }),
+          h(GSlider, { label: 'Unschärfe', value: s.blur, min: 0, max: 30, format: (v) => v + 'px', onChange: upd('blur') }),
+          h(GSlider, { label: 'Sättigung', value: s.sat, min: 100, max: 220, format: (v) => v + '%', onChange: upd('sat') }),
+          h(GSlider, { label: 'Helligkeit', value: s.bright, min: 80, max: 140, format: (v) => v + '%', onChange: upd('bright') }))),
 
       /* ---- Form ---- */
-      h('div', { className: 'col gap-18' },
-        h(Card, { title: 'Form', icon: 'spark', info: 'Geometrie und Tönung der Glas-Kästchen.' },
-          h('div', { className: 'ff-gs-stack' },
-            h(GSlider, { label: 'Eckenradius', value: s.radius, min: 0, max: 44, format: (v) => v + 'px', hint: 'Rundung der Glas-Ecken', onChange: upd('radius') }),
-            h(GToggle, { label: 'Heller Hintergrund', value: s.overLight, hint: 'Glas dunkler tönen (für helle Hintergründe)', onChange: upd('overLight') })),
-          h('div', { className: 'row', style: { marginTop: 22 } },
-            h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => { G.reset(); B && B.reset(); } }, h(Icon, { name: 'refresh', size: 15 }), 'Auf Standard zurücksetzen'))),
-        h(AiInsight, { title: 'Hinweis' }, 'Hintergrund und Glas werden live auf alle Kästchen angewendet – auch auf diese Karten. Einstellungen bleiben gespeichert.')));
+      h(Card, { title: 'Form', icon: 'spark', info: 'Geometrie und Tönung der Glas-Kästchen.' },
+        h('div', { className: 'ff-gs-stack' },
+          h(GSlider, { label: 'Eckenradius', value: s.radius, min: 0, max: 44, format: (v) => v + 'px', onChange: upd('radius') }),
+          h(GToggle, { label: 'Heller Hintergrund', value: s.overLight, hint: 'Glas dunkler tönen, z. B. für helle Fotos', onChange: upd('overLight') })),
+        h('div', { className: 'row', style: { marginTop: 20 } },
+          h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => { G.reset(); B && B.reset(); } }, h(Icon, { name: 'refresh', size: 15 }), 'Auf Standard zurücksetzen'))),
+
+      h('p', { className: 'ff-ds-foot', style: { gridColumn: '1 / -1' } }, 'Änderungen wirken sofort auf die gesamte Oberfläche und bleiben gespeichert.'));
   }
   function GSlider({ label, hint, value, min, max, step = 1, format, onChange }) {
     const trackRef = useRef(null);
@@ -329,10 +352,11 @@
 
   function GToggle({ label, hint, value, onChange }) {
     return h('button', { className: 'row between center', onClick: () => onChange(!value),
-      style: { width: '100%', padding: '18px 0 4px', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left' } },
-      h('div', { className: 'col gap-4' },
+      style: { width: '100%', padding: '14px 0 4px', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', gap: 16 },
+      role: 'switch', 'aria-checked': !!value },
+      h('div', { className: 'col gap-3', style: { minWidth: 0 } },
         h('span', { className: 'ff-gs-label' }, label),
-        hint && h('span', { className: 'ff-gs-hint', style: { marginTop: 0 } }, hint)),
+        hint && h('span', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.4 } }, hint)),
       h('span', { className: 'ff-gtoggle' + (value ? ' is-on' : '') },
         h('span', { className: 'ff-gtoggle-knob' })));
   }
@@ -347,6 +371,7 @@
     const [acct, setAcct] = useState(() => (Auth ? Auth.get() : { email: '', loggedIn: false }));
     const [pane, setPane] = useState(null);   // null | 'email' | 'password' | 'delete'
     const [toast, setToast] = useState(null);
+    const [del, setDel] = useState({ busy: false, err: null });
 
     useEffect(() => { if (!Auth) return; return Auth.subscribe((s) => setAcct(s)); }, []);
     useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 3200); return () => clearTimeout(id); }, [toast]);
@@ -362,59 +387,78 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       flash('Daten als JSON exportiert.');
     };
+    const doDelete = async () => {
+      if (del.busy) return;
+      setDel({ busy: true, err: null });
+      // capture the account BEFORE deletion so we can wipe its local imports afterwards
+      const acc = Auth.currentAccount && Auth.currentAccount();
+      const res = await Auth.deleteAccount();
+      if (res && res.ok) {
+        if (window.FFImports) { try { window.FFImports.clear(acc); } catch (e) { /* noop */ } }
+        // success: signOut emitted an auth change → Root routes to the login screen
+      } else {
+        setDel({ busy: false, err: (res && res.error) || 'Konto konnte nicht gelöscht werden.' });
+      }
+    };
+
+    // einheitliche Zeile: Label + Wert links, genau ein Bedienelement rechts
+    const AcctRow = (label, value, action, valueStyle) =>
+      h('div', { className: 'ff-setrow' },
+        h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+          h('span', { className: 'label' }, label),
+          h('span', { className: 'strong', style: Object.assign({ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }, valueStyle) }, value)),
+        action);
 
     return h(Card, { title: 'Konto', icon: 'profile', tour: 'konto' },
-      h('div', { className: 'col gap-14' },
-        h('div', { className: 'row between center', style: { padding: '2px 0' } },
-          h('div', { className: 'row center gap-10' },
-            h('span', { className: 'ff-acct-dot is-on' }),
-            h('div', { className: 'col gap-1' },
-              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, 'Angemeldet'),
-              h('span', { style: { fontSize: 11.5, color: 'var(--text-3)' } }, acct.email))),
+      h('div', { className: 'col', style: { height: '100%' } },
+        toast && h('div', { className: 'ff-acct-toast', style: { marginBottom: 12 } }, h(Icon, { name: 'check', size: 14 }), h('span', null, toast)),
+
+        // ---- status
+        h('div', { className: 'ff-setrow' },
+          h('div', { className: 'col gap-1', style: { minWidth: 0 } },
+            h('span', { className: 'label' }, 'Status'),
+            h('div', { className: 'row center gap-8' },
+              h('span', { className: 'ff-acct-dot is-on' }),
+              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, 'Angemeldet'))),
           h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'spark', size: 12 }), `FitFlow ${a.plan}`)),
-
-        toast && h('div', { className: 'ff-acct-toast' }, h(Icon, { name: 'check', size: 14 }), h('span', null, toast)),
-
-        h('div', { className: 'rule' }),
 
         // ---- e-mail row / inline editor
         pane === 'email'
-          ? h(EmailEditor, { current: acct.email, onCancel: () => setPane(null), onSaved: (msg) => { setPane(null); flash(msg); } })
-          : h('div', { className: 'ff-acct-row' },
-              h('div', { className: 'col gap-1', style: { minWidth: 0 } },
-                h('span', { className: 'label' }, 'E-Mail-Adresse'),
-                h('span', { className: 'strong', style: { fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, acct.email)),
+          ? h('div', { className: 'ff-setrow ff-setrow--stack' },
+              h(EmailEditor, { current: acct.email, onCancel: () => setPane(null), onSaved: (msg) => { setPane(null); flash(msg); } }))
+          : AcctRow('E-Mail-Adresse', acct.email,
               h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane('email') }, h(Icon, { name: 'mailOpen', size: 14 }), 'Ändern')),
 
         // ---- password row / inline editor
         pane === 'password'
-          ? h(PasswordEditor, { onCancel: () => setPane(null), onSaved: () => { setPane(null); flash('Passwort aktualisiert.'); } })
-          : h('div', { className: 'ff-acct-row' },
-              h('div', { className: 'col gap-1' },
-                h('span', { className: 'label' }, 'Passwort'),
-                h('span', { className: 'strong', style: { fontSize: 13.5, letterSpacing: '.12em' } }, '••••••••')),
-              h('button', { className: 'btn btn--outline btn--sm', onClick: () => setPane('password') }, h(Icon, { name: 'lock', size: 14 }), 'Ändern')),
+          ? h('div', { className: 'ff-setrow ff-setrow--stack' },
+              h(PasswordEditor, { onCancel: () => setPane(null), onSaved: () => { setPane(null); flash('Passwort aktualisiert.'); } }))
+          : AcctRow('Passwort', '••••••••',
+              h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane('password') }, h(Icon, { name: 'lock', size: 14 }), 'Ändern'),
+              { letterSpacing: '.12em' }),
 
-        h('button', { className: 'btn btn--ghost btn--sm', style: { alignSelf: 'flex-start' }, onClick: onExport },
-          h(Icon, { name: 'download', size: 14 }), 'Daten exportieren'),
+        // ---- data export as a row like all others
+        AcctRow('Datenexport', 'Alle Daten als JSON-Datei',
+          h('button', { className: 'btn btn--ghost btn--sm', onClick: onExport }, h(Icon, { name: 'download', size: 14 }), 'Exportieren'),
+          { fontWeight: 500, color: 'var(--text-3)' }),
 
-        // ---- delete (with confirmation)
-        pane === 'delete'
-          ? h('div', { className: 'ff-acct-confirm' },
-              h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
-                h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
-                h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
-              h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
-                'Alle lokal gespeicherten Zugangsdaten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
-              h('div', { className: 'row gap-8' },
-                h('button', { className: 'btn btn--ghost btn--sm', onClick: () => setPane(null) }, 'Abbrechen'),
-                h('button', { className: 'btn btn--sm ff-btn-danger', onClick: () => Auth.deleteAccount() }, h(Icon, { name: 'trash', size: 14 }), 'Endgültig löschen')))
-          : h('button', { className: 'ff-acct-danger', onClick: () => setPane('delete') },
-              h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'),
-
-        h('div', { className: 'rule' }),
-        h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
-          h(Icon, { name: 'logout', size: 16 }), 'Abmelden')));
+        // ---- footer: sign out, then the danger zone tucked underneath
+        h('div', { className: 'col gap-12', style: { marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line-soft)' } },
+          h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
+            h(Icon, { name: 'logout', size: 16 }), 'Abmelden'),
+          pane === 'delete'
+            ? h('div', { className: 'ff-acct-confirm' },
+                h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
+                  h(Icon, { name: 'trash', size: 15, style: { color: 'var(--bad)' } }),
+                  h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, 'Konto wirklich löschen?')),
+                h('p', { style: { fontSize: 12, color: 'var(--text-3)', lineHeight: 1.45, margin: '0 0 12px' } },
+                  'Dein Konto wird endgültig vom Server (Supabase) gelöscht, alle lokal gespeicherten Daten werden entfernt und du wirst abgemeldet. Dieser Schritt kann nicht rückgängig gemacht werden.'),
+                del.err && h('p', { style: { fontSize: 12, color: 'var(--bad)', lineHeight: 1.45, margin: '0 0 12px' } }, del.err),
+                h('div', { className: 'row gap-8' },
+                  h('button', { className: 'btn btn--ghost btn--sm', disabled: del.busy, onClick: () => { setDel({ busy: false, err: null }); setPane(null); } }, 'Abbrechen'),
+                  h('button', { className: 'btn btn--sm ff-btn-danger', disabled: del.busy, onClick: doDelete }, h(Icon, { name: 'trash', size: 14 }), del.busy ? 'Wird gelöscht …' : 'Endgültig löschen')))
+            : h('button', { className: 'ff-acct-danger', style: { alignSelf: 'center' }, onClick: () => setPane('delete') },
+                h(Icon, { name: 'trash', size: 14 }), 'Konto löschen'))));
   }
 
   /* inline e-mail editor */
@@ -473,7 +517,7 @@
      EINSTELLUNGEN — Einheiten, Sprache, Zeit, Benachrichtigungen
      ============================================================ */
   function SetRow({ label, hint, children }) {
-    return h('div', { className: 'row between center', style: { gap: 14, padding: '11px 0', borderTop: '1px solid var(--line-soft)' } },
+    return h('div', { className: 'ff-setrow' },
       h('div', { className: 'col gap-1', style: { minWidth: 0 } },
         h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
         hint && h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, hint)),
@@ -484,8 +528,7 @@
       h('button', { key: v, className: 'ff-pill' + (value === v ? ' is-active' : ''), style: { height: 32, fontSize: 12, padding: '0 12px' }, onClick: () => onChange(v) }, l)));
   }
   function NotiRow({ label, value, onChange }) {
-    return h('button', { className: 'row between center', onClick: () => onChange(!value),
-      style: { width: '100%', padding: '11px 0', borderTop: '1px solid var(--line-soft)', background: 'none', border: 0, borderTopWidth: 1, borderTopStyle: 'solid', borderTopColor: 'var(--line-soft)', cursor: 'pointer', textAlign: 'left' } },
+    return h('button', { className: 'ff-setrow', onClick: () => onChange(!value) },
       h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 500 } }, label),
       h('span', { className: 'ff-gtoggle' + (value ? ' is-on' : '') }, h('span', { className: 'ff-gtoggle-knob' })));
   }
@@ -500,16 +543,19 @@
         ? [['de', 'Deutsch'], ['en', 'English'], ['it', 'Italiano']].map(([k, l]) => h('option', { key: k, value: k }, l))
         : [['Europe/Vienna', 'Wien (MEZ)'], ['Europe/Berlin', 'Berlin (MEZ)'], ['Europe/Rome', 'Rom (MEZ)'], ['Europe/London', 'London (GMT)']].map(([k, l]) => h('option', { key: k, value: k }, l)));
     return h(Card, { title: 'Einstellungen', icon: 'settings' },
-      h('div', { className: 'col' },
-        h(SetRow, { label: 'Einheiten', hint: 'Distanz, Gewicht & Tempo', children: h(Seg, { value: units, options: [['metric', 'Metrisch'], ['imperial', 'Imperial']], onChange: setUnits }) }),
-        h(SetRow, { label: 'Sprache', children: sel(lang, setLang) }),
-        h(SetRow, { label: 'Zeitzone', children: sel(tz, setTz) }),
-        h(SetRow, { label: 'Wochenstart', children: h(Seg, { value: week, options: [['mo', 'Mo'], ['su', 'So']], onChange: setWeek }) }),
-        h('div', { className: 'label', style: { padding: '16px 0 2px' } }, 'Benachrichtigungen'),
-        h(NotiRow, { label: 'Trainingserinnerungen', value: noti.reminder, onChange: (v) => setNoti({ ...noti, reminder: v }) }),
-        h(NotiRow, { label: 'Wochenrückblick per E-Mail', value: noti.weekly, onChange: (v) => setNoti({ ...noti, weekly: v }) }),
-        h(NotiRow, { label: 'Sync- & Import-Hinweise', value: noti.sync, onChange: (v) => setNoti({ ...noti, sync: v }) }),
-        h(NotiRow, { label: 'Push auf Mobilgerät', value: noti.push, onChange: (v) => setNoti({ ...noti, push: v }) })));
+      h('div', { className: 'ff-grid grid-2', style: { gap: '4px 44px', alignItems: 'start' } },
+        h('div', { className: 'col' },
+          h('div', { className: 'label', style: { padding: '2px 0 4px' } }, 'Allgemein'),
+          h(SetRow, { label: 'Einheiten', hint: 'Distanz, Gewicht & Tempo', children: h(Seg, { value: units, options: [['metric', 'Metrisch'], ['imperial', 'Imperial']], onChange: setUnits }) }),
+          h(SetRow, { label: 'Sprache', children: sel(lang, setLang) }),
+          h(SetRow, { label: 'Zeitzone', children: sel(tz, setTz) }),
+          h(SetRow, { label: 'Wochenstart', children: h(Seg, { value: week, options: [['mo', 'Mo'], ['su', 'So']], onChange: setWeek }) })),
+        h('div', { className: 'col' },
+          h('div', { className: 'label', style: { padding: '2px 0 4px' } }, 'Benachrichtigungen'),
+          h(NotiRow, { label: 'Trainingserinnerungen', value: noti.reminder, onChange: (v) => setNoti({ ...noti, reminder: v }) }),
+          h(NotiRow, { label: 'Wochenrückblick per E-Mail', value: noti.weekly, onChange: (v) => setNoti({ ...noti, weekly: v }) }),
+          h(NotiRow, { label: 'Sync- & Import-Hinweise', value: noti.sync, onChange: (v) => setNoti({ ...noti, sync: v }) }),
+          h(NotiRow, { label: 'Push auf Mobilgerät', value: noti.push, onChange: (v) => setNoti({ ...noti, push: v }) }))));
   }
 
   /* ============================================================

@@ -32,6 +32,17 @@
   /* scenic photo backdrop (sharp, full-bleed) */
   const PHOTO_URL = 'https://cdn.hasselblad.com/f/77891/11656x8742/237f663ffc/x-system_02_download.jpg';
 
+  /* looping wallpaper videos (full-bleed, muted) — user-supplied animations.
+     Paths are relative to the document (index.html / FitFlow.html at the app
+     root), matching the onboarding-intro.mp4 convention. */
+  const VIDEOS = [
+    { id: 1, label: 'Animation 1', url: 'fitflow/wallpapers/wallpaper-1.mp4' },
+    { id: 2, label: 'Animation 2', url: 'fitflow/wallpapers/wallpaper-2.mp4' },
+    { id: 3, label: 'Animation 3', url: 'fitflow/wallpapers/wallpaper-3.mp4' },
+    { id: 4, label: 'Animation 4', url: 'fitflow/wallpapers/wallpaper-4.mp4' },
+  ];
+  function videoUrl(id) { const v = VIDEOS.find((x) => x.id === id) || VIDEOS[0]; return v.url; }
+
   /* flat solid-colour backdrops — neutral tones that sit well behind the
      liquid-glass panels (mostly deep darks plus one light option) */
   const SOLID_PRESETS = [
@@ -44,11 +55,12 @@
   ];
 
   const DEFAULTS = {
-    mode: 'etheral',    // beams | etheral | bars | paths | photo | solid
+    mode: 'video',      // beams | etheral | bars | paths | video | photo | solid
     color: '#7C5CFF',   // dominant colour (violet) — used by the animated modes
     solidColor: '#0a0d14', // flat fill colour (solid mode)
-    intensity: 55,      // overall strength (→ layer opacity), 30–100
+    intensity: 50,      // overall strength (→ layer opacity), 30–100
     bars: 15,           // bar count (bars mode)
+    video: 4,           // which wallpaper video (video mode), see VIDEOS — Animation 4 (Thinkogic) ist der Standard-Hintergrund für neue Konten
     photo: null,        // custom uploaded background (data URL); null → scenic default
     photoScale: 1,      // zoom factor for photo (1–3)
     photoX: 50,         // horizontal focus / crop, 0–100 %
@@ -73,6 +85,12 @@
     return { r: (i >> 16) & 255, g: (i >> 8) & 255, b: i & 255 };
   }
   function rgba(hex, a) { const { r, g, b } = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+
+  /* multi-hue spectrum — selected via color:'rainbow'; every scene spreads its
+     elements across these hues, and render() adds a slow hue-rotate cycle */
+  const RAINBOW = ['#ff4d4d', '#ffb13d', '#35d073', '#38b6ff', '#7C5CFF', '#ff4fd8'];
+  function isRainbow() { return S.color === 'rainbow'; }
+  function colAt(i) { return isRainbow() ? RAINBOW[i % RAINBOW.length] : S.color; }
   function hexToHue(hex) {
     let { r, g, b } = hexToRgb(hex); r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
@@ -111,17 +129,16 @@
      only opacity reads. The wash guarantees every glass box, in every tab,
      sits over colour and responds to all material settings. ---- */
   function buildWash() {
-    const c = S.color;
     const wash = document.createElement('div');
     wash.className = 'ff-bg-wash';
     wash.style.cssText =
       'position:absolute;inset:0;pointer-events:none;' +
       'background:' +
-        `radial-gradient(62% 70% at 18% 22%, ${rgba(c, 0.30)} 0%, transparent 68%),` +
-        `radial-gradient(58% 66% at 82% 30%, ${rgba(c, 0.24)} 0%, transparent 70%),` +
-        `radial-gradient(64% 72% at 60% 80%, ${rgba(c, 0.22)} 0%, transparent 72%),` +
-        `radial-gradient(54% 62% at 30% 68%, ${rgba(c, 0.18)} 0%, transparent 72%),` +
-        `radial-gradient(70% 80% at 90% 88%, ${rgba(c, 0.17)} 0%, transparent 74%);`;
+        `radial-gradient(62% 70% at 18% 22%, ${rgba(colAt(0), 0.30)} 0%, transparent 68%),` +
+        `radial-gradient(58% 66% at 82% 30%, ${rgba(colAt(1), 0.24)} 0%, transparent 70%),` +
+        `radial-gradient(64% 72% at 60% 80%, ${rgba(colAt(2), 0.22)} 0%, transparent 72%),` +
+        `radial-gradient(54% 62% at 30% 68%, ${rgba(colAt(3), 0.18)} 0%, transparent 72%),` +
+        `radial-gradient(70% 80% at 90% 88%, ${rgba(colAt(4), 0.17)} 0%, transparent 74%);`;
     root.appendChild(wash);
   }
 
@@ -135,7 +152,7 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const hue = hexToHue(S.color);
+    const hues = (isRainbow() ? RAINBOW : [S.color]).map(hexToHue);
     let beams = [], dpr = 1, cw = 0, ch = 0, raf = null;
 
     const make = () => ({
@@ -148,6 +165,7 @@
       opacity: 0.22 + Math.random() * 0.16,
       pulse: Math.random() * Math.PI * 2,
       pulseSpeed: 0.018 + Math.random() * 0.026,
+      hue: hues[Math.floor(Math.random() * hues.length)],
     });
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -164,6 +182,7 @@
       b.width = 120 + Math.random() * 150;
       b.speed = 0.5 + Math.random() * 0.5;
       b.opacity = 0.24 + Math.random() * 0.14;
+      b.hue = hues[Math.floor(Math.random() * hues.length)];
     }
     function draw(b) {
       ctx.save();
@@ -171,7 +190,7 @@
       ctx.rotate((b.angle * Math.PI) / 180);
       const o = b.opacity * (0.8 + Math.sin(b.pulse) * 0.2);
       const g = ctx.createLinearGradient(0, 0, 0, b.length);
-      const c = (a) => `hsla(${hue}, 100%, 62%, ${a})`;
+      const c = (a) => `hsla(${b.hue}, 100%, 62%, ${a})`;
       g.addColorStop(0, c(0)); g.addColorStop(0.1, c(o * 0.5));
       g.addColorStop(0.4, c(o)); g.addColorStop(0.6, c(o));
       g.addColorStop(0.9, c(o * 0.5)); g.addColorStop(1, c(0));
@@ -214,7 +233,6 @@
   function buildEtheral() {
     const id = 'ff-eth-' + Math.random().toString(36).slice(2, 8);
     const scale = map(S.intensity, 30, 100, 45, 95);     // displacement strength
-    const c = S.color;
 
     // SVG filter (turbulence → animated hue-rotate → displacement ×2)
     const svgNS = 'http://www.w3.org/2000/svg';
@@ -237,11 +255,11 @@
       `position:absolute;inset:-12%;` +
       `filter:url(#${id}) blur(12px);` +
       `background:` +
-        `radial-gradient(38% 46% at 28% 32%, ${rgba(c, 0.85)} 0%, transparent 68%),` +
-        `radial-gradient(42% 52% at 72% 64%, ${rgba(c, 0.6)} 0%, transparent 70%),` +
-        `radial-gradient(46% 56% at 58% 18%, ${rgba(c, 0.45)} 0%, transparent 74%),` +
-        `radial-gradient(50% 60% at 18% 78%, ${rgba(c, 0.5)} 0%, transparent 72%),` +
-        `radial-gradient(60% 70% at 85% 30%, ${rgba(c, 0.35)} 0%, transparent 76%);`;
+        `radial-gradient(38% 46% at 28% 32%, ${rgba(colAt(0), 0.85)} 0%, transparent 68%),` +
+        `radial-gradient(42% 52% at 72% 64%, ${rgba(colAt(1), 0.6)} 0%, transparent 70%),` +
+        `radial-gradient(46% 56% at 58% 18%, ${rgba(colAt(2), 0.45)} 0%, transparent 74%),` +
+        `radial-gradient(50% 60% at 18% 78%, ${rgba(colAt(3), 0.5)} 0%, transparent 72%),` +
+        `radial-gradient(60% 70% at 85% 30%, ${rgba(colAt(4), 0.35)} 0%, transparent 76%);`;
     root.appendChild(fog);
 
     const hueEl = svg.querySelector('.hue');
@@ -269,7 +287,6 @@
      ============================================================ */
   function buildBars() {
     const n = Math.max(3, Math.min(30, S.bars | 0));
-    const c = S.color;
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:absolute;inset:0;display:flex;filter:blur(4px) saturate(125%);';
 
@@ -280,10 +297,11 @@
     };
     for (let i = 0; i < n; i++) {
       const h = height(i) / 100;
+      const bc = colAt(i);
       const bar = document.createElement('div');
       bar.style.cssText =
         `flex:1 0 calc(100% / ${n});max-width:calc(100% / ${n});height:100%;` +
-        `background:linear-gradient(to top, ${rgba(c, 0.95)}, ${rgba(c, 0)});` +
+        `background:linear-gradient(to top, ${rgba(bc, 0.95)}, ${rgba(bc, 0)});` +
         `transform:scaleY(${h});transform-origin:bottom;` +
         `animation:ff-bar-pulse 2s ease-in-out ${i * 0.12}s infinite alternate;` +
         `--isc:${h};`;
@@ -299,7 +317,6 @@
      offset along each path. Recoloured to S.color. No blur (sharp lines).
      ============================================================ */
   function buildPaths() {
-    const c = S.color;
     // Auf Touch-/Pencil-Geräten (iPad: pointer coarse) die teure Animation NICHT pro
     // Frame neu auswerten — der Hintergrund bleibt statisch (sieht praktisch gleich aus),
     // spart aber konstant GPU und nimmt das Dauer-Ruckeln raus.
@@ -320,7 +337,7 @@
           `C${616 - i * 5 * position} ${470 - i * 6} ${684 - i * 5 * position} ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`;
         const p = document.createElementNS(svgNS, 'path');
         p.setAttribute('d', d);
-        p.setAttribute('stroke', c);
+        p.setAttribute('stroke', colAt(Math.floor(i / 6)));   // 6 hue bands per fan when rainbow
         p.setAttribute('stroke-width', (0.6 + i * 0.06).toFixed(2));
         p.setAttribute('fill', 'none');
         p.setAttribute('pathLength', '1');
@@ -356,6 +373,30 @@
   }
 
   /* ============================================================
+     VIDEO — looping wallpaper animation, muted & full-bleed
+     ============================================================ */
+  function buildVideo() {
+    const vid = document.createElement('video');
+    vid.src = videoUrl(S.video);
+    vid.muted = true; vid.defaultMuted = true;
+    vid.loop = true; vid.autoplay = true;
+    vid.playsInline = true; vid.setAttribute('playsinline', '');
+    vid.setAttribute('webkit-playsinline', '');
+    vid.preload = 'auto';
+    vid.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' +
+      'background-color:#0a0d14;';
+    root.appendChild(vid);
+    // reduced-motion / touch: hold a still frame rather than loop-playing
+    const still = window.matchMedia && (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.matchMedia('(pointer: coarse)').matches);
+    if (still) { vid.autoplay = false; vid.pause(); }
+    else { const p = vid.play(); if (p && p.catch) p.catch(() => {}); }
+    return () => { try { vid.pause(); vid.removeAttribute('src'); vid.load(); } catch (e) {} };
+  }
+
+  /* ============================================================
      PHOTO — scenic landscape, sharp & full-bleed
      ============================================================ */
   function buildPhoto() {
@@ -377,7 +418,8 @@
     s.textContent =
       '@keyframes ff-bar-pulse{0%{transform:scaleY(var(--isc))}100%{transform:scaleY(calc(var(--isc) * 0.62))}}' +
       '@keyframes ff-path-flow{to{stroke-dashoffset:-1}}' +
-      '@keyframes ff-path-pulse{0%,100%{stroke-opacity:var(--o0)}50%{stroke-opacity:var(--o1)}}';
+      '@keyframes ff-path-pulse{0%,100%{stroke-opacity:var(--o0)}50%{stroke-opacity:var(--o1)}}' +
+      '@keyframes ff-hue-cycle{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}';
     document.head.appendChild(s);
   }
 
@@ -387,14 +429,22 @@
     injectStyle();
     if (cleanup) { try { cleanup(); } catch (e) {} cleanup = null; }
     root.innerHTML = '';
-    if (S.mode !== 'photo' && S.mode !== 'solid') buildWash();
+    if (S.mode !== 'photo' && S.mode !== 'solid' && S.mode !== 'video') buildWash();
     if (S.mode === 'etheral') cleanup = buildEtheral();
     else if (S.mode === 'bars') cleanup = buildBars();
     else if (S.mode === 'paths') cleanup = buildPaths();
+    else if (S.mode === 'video') cleanup = buildVideo();
     else if (S.mode === 'photo') cleanup = buildPhoto();
     else if (S.mode === 'solid') cleanup = buildSolid();
     else cleanup = buildBeams();
     applyIntensity();
+    // Regenbogen: langsamer Spektrum-Cycle als billiger GPU-Filter auf dem Layer.
+    // Auf Touch-Geräten (maxTouchPoints — Media-Features lügen im iPad-Desktop-Modus)
+    // und bei reduced-motion bleibt es statisch verteilt.
+    const still = ((navigator.maxTouchPoints || 0) > 0) || (window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    root.style.animation = (isRainbow() && !still && S.mode !== 'photo' && S.mode !== 'solid' && S.mode !== 'video')
+      ? 'ff-hue-cycle 24s linear infinite' : '';
   }
 
   // strukturelle Änderungen (z. B. Balkenanzahl) bauen den Hintergrund komplett neu —
@@ -411,14 +461,14 @@
   }
 
   window.FFBackground = {
-    DEFAULTS, PRESETS, SOLID_PRESETS, PHOTO_URL,
+    DEFAULTS, PRESETS, SOLID_PRESETS, PHOTO_URL, RAINBOW, VIDEOS,
     get() { return Object.assign({}, S); },
     set(partial) {
       const prev = S;
       S = Object.assign({}, S, partial);
       try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
       // intensity-only change → just fade, no costly rebuild
-      const structural = ['mode', 'color', 'solidColor', 'bars', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
+      const structural = ['mode', 'color', 'solidColor', 'bars', 'video', 'photo'].some((k) => k in partial && partial[k] !== prev[k]);
       const photoXform = ['photoScale', 'photoX', 'photoY'].some((k) => k in partial && partial[k] !== prev[k]);
       if (!root) render();
       else if (structural) renderSoon();   // teuren Rebuild auf 1×/Frame drosseln
