@@ -236,26 +236,27 @@
         h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-4)' } }, 'durchgezogen = Ist · gestrichelt = projiziert')));
   }
 
-  /* small +/- stepper button (matches Jahresplanung) */
-  function StepBtn({ children, onClick, disabled }) {
-    return h('button', { type: 'button', onClick, disabled,
-      style: { width: 26, height: 26, borderRadius: 7, flexShrink: 0, border: '1px solid var(--line-2)', background: 'var(--panel-2)',
-        color: disabled ? 'var(--text-4)' : 'var(--text)', cursor: disabled ? 'default' : 'pointer', fontSize: 14, lineHeight: 1,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'background .2s, border-color .2s' } }, children);
+  /* iOS-Stepper: eine Kapsel mit −/+ Segmenten und Haarlinie dazwischen (wie UIStepper) */
+  function Stepper({ onMinus, onPlus, minusOff, plusOff }) {
+    const seg = (glyph, onClick, off) => h('button', { type: 'button', onClick, disabled: off,
+      style: { width: 34, height: 27, border: 'none', background: 'transparent', padding: 0,
+        color: off ? 'var(--text-4)' : 'var(--text)', cursor: off ? 'default' : 'pointer',
+        fontSize: 15, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' } }, glyph);
+    return h('div', { className: 'row center', style: { borderRadius: 9, background: 'var(--panel-2)', border: '1px solid var(--line)', overflow: 'hidden', flexShrink: 0 } },
+      seg('−', onMinus, minusOff),
+      h('span', { style: { width: 1, height: 15, background: 'var(--line)', flexShrink: 0 } }),
+      seg('+', onPlus, plusOff));
   }
   function StepRow({ icon, label, value, sub, onMinus, onPlus, minusOff, plusOff, locked }) {
-    return h('div', { className: 'row between center', style: { padding: '11px 0', borderBottom: '1px solid var(--line-soft)' } },
+    return h('div', { className: 'row between center', style: { padding: '12px 0', borderBottom: '1px solid var(--line-soft)' } },
       h('div', { className: 'row center gap-10', style: { minWidth: 0 } },
-        h('div', { style: { width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', color: 'var(--text-3)', border: '1px solid var(--line)' } }, h(Icon, { name: icon, size: 15 })),
+        h('div', { style: { width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', color: 'var(--text-3)', border: '1px solid var(--line)' } }, h(Icon, { name: icon, size: 15 })),
         h('div', { className: 'col', style: { gap: 1, minWidth: 0 } },
-          h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, label),
-          sub && h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--text-4)' } }, sub))),
-      locked
-        ? h('span', { className: 'mono', style: { fontSize: 14, fontWeight: 700, color: 'var(--text-2)', minWidth: 64, textAlign: 'right' } }, value)
-        : h('div', { className: 'row center gap-9' },
-            h(StepBtn, { onClick: onMinus, disabled: minusOff }, '−'),
-            h('span', { className: 'mono', style: { fontSize: 14, fontWeight: 700, minWidth: 64, textAlign: 'center', color: 'var(--text)' } }, value),
-            h(StepBtn, { onClick: onPlus, disabled: plusOff }, '+')));
+          h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600, letterSpacing: '-.005em' } }, label),
+          sub && h('span', { style: { fontSize: 11, color: 'var(--text-4)' } }, sub))),
+      h('div', { className: 'row center gap-10', style: { flexShrink: 0 } },
+        h('span', { className: 'mono', style: { fontSize: 14, fontWeight: 600, color: locked ? 'var(--text-2)' : 'var(--text)', textAlign: 'right', minWidth: 46 } }, value),
+        !locked && h(Stepper, { onMinus, onPlus, minusOff, plusOff })));
   }
 
   /* outcome stat */
@@ -372,10 +373,10 @@
         /* control panel */
         h(Card, { title: 'Taper-Optimizer', icon: 'sliders',
             info: 'KI tunt Taper-Länge und Volumenreduktion so, dass die Form punktgenau am Renntag gipfelt. Oder plane selbst.',
-            right: h(Tabs, { items: [{ value: 'ai', label: 'KI-Taper' }, { value: 'manual', label: 'Selbst planen' }], value: mode, onChange: setModeTo }) },
+            right: h(Tabs, { items: [{ value: 'ai', label: 'Automatisch' }, { value: 'manual', label: 'Selbst planen' }], value: mode, onChange: setModeTo }) },
           h('div', { className: 'col', style: { gap: 0 } },
-            mode === 'ai' && h('div', { className: 'row center gap-8', style: { padding: '2px 0 12px' } },
-              h('span', { className: 'chip chip--solid', style: { height: 22, fontSize: 10 } }, h(Icon, { name: 'spark', size: 12 }), 'KI optimiert auf +20 TSB am Renntag')),
+            mode === 'ai' && h('div', { style: { padding: '2px 0 10px', fontSize: 11.5, color: 'var(--text-4)' } },
+              'Taper-Länge und Volumen werden automatisch auf +20 TSB am Renntag abgestimmt.'),
             h(StepRow, { icon: 'forecast', label: 'Aufbau-Ziel (Peak CTL)', sub: `Fitness-Gipfel vor dem Taper`,
               value: Math.round(peakCtl),
               onMinus: () => setPeakCtl((v) => Math.max(Math.round(start.ctl), v - 2)),
@@ -389,20 +390,23 @@
               value: `−${dropPct}%`, locked: mode === 'ai',
               onMinus: () => setDrop((v) => Math.max(0.30, +(v - 0.05).toFixed(2))), onPlus: () => setDrop((v) => Math.min(0.65, +(v + 0.05).toFixed(2))),
               minusOff: drop <= 0.30, plusOff: drop >= 0.65 }),
-            // optimal banner
-            h('div', { className: 'row center gap-8', style: { marginTop: 14, padding: '11px 13px', borderRadius: 10,
-                background: optimal ? 'color-mix(in srgb, var(--good) 12%, transparent)' : 'var(--panel-2)',
-                border: `1px solid ${optimal ? 'color-mix(in srgb, var(--good) 35%, transparent)' : 'var(--line)'}` } },
-              h('span', { style: { color: optimal ? 'var(--good)' : 'var(--warn)' } }, h(Icon, { name: optimal ? 'check' : 'info', size: 16 })),
-              h('span', { style: { fontSize: 12.5, lineHeight: 1.4, color: 'var(--text-2)' } },
+            // Status-Zeile (ruhig: Farbpunkt + Text, keine bunte Box)
+            h('div', { className: 'row center', style: { gap: 11, marginTop: 14, padding: '11px 13px', borderRadius: 11,
+                background: optimal ? 'color-mix(in srgb, var(--good) 7%, transparent)' : 'transparent',
+                border: `1px solid ${optimal ? 'color-mix(in srgb, var(--good) 20%, transparent)' : 'var(--line-soft)'}` } },
+              h('span', { style: { width: 7, height: 7, borderRadius: 99, flexShrink: 0, background: optimal ? 'var(--good)' : 'var(--warn)' } }),
+              h('span', { style: { fontSize: 12.5, lineHeight: 1.45, color: 'var(--text-2)' } },
                 optimal ? 'Optimaler Taper: Form gipfelt im Renn-Fenster, Fitness bleibt hoch.'
                   : `Form-Peak ${Math.abs(peakOff)} Tage ${peakOff < 0 ? 'vor' : 'nach'} dem Renntag — Taper anpassen.`)),
-            mode === 'manual' && h('button', { type: 'button', className: 'chip', style: { cursor: 'pointer', alignSelf: 'flex-start', marginTop: 12, height: 28, fontSize: 11.5, borderColor: 'color-mix(in srgb, var(--accent) 45%, transparent)', color: 'var(--accent-bright)' }, onClick: resetToAI },
-              h(Icon, { name: 'spark', size: 13 }), 'KI-Taper übernehmen'))),
+            mode === 'manual' && h('button', { type: 'button', onClick: resetToAI,
+                style: { cursor: 'pointer', alignSelf: 'flex-start', marginTop: 12, height: 30, padding: '0 14px', fontSize: 12, fontWeight: 600,
+                  borderRadius: 99, border: 'none', background: 'var(--accent-soft)', color: 'var(--accent-bright)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6 } },
+              'Empfehlung übernehmen'))),
 
         /* analysis */
         h(Card, { title: 'Prognose-Auswertung', icon: 'gauge',
-            right: h('span', { className: 'chip', style: { height: 24, color: `var(--${band.c})`, borderColor: `color-mix(in srgb, var(--${band.c}) 40%, transparent)` } },
+            right: h('span', { className: 'chip', style: { height: 24, fontSize: 11, color: 'var(--text-2)', borderColor: 'var(--line)', background: 'var(--panel-2)' } },
               h('span', { className: 'dot', style: { background: `var(--${band.c})` } }), band.t) },
           // peak fitness vs race fitness mini-visual
           h('div', { className: 'col gap-14' },
@@ -410,26 +414,28 @@
               h('div', { className: 'col gap-2' },
                 h('span', { className: 'label' }, 'Zeitplan'),
                 h('span', { className: 'strong', style: { fontSize: 14, fontWeight: 600 } }, `Aufbau bis ${fmt.date(taperStartDate)} · Taper ${effTw} Wo`)),
-              h('span', { className: 'chip', style: { height: 24, color: `var(--${verdict.c})`, borderColor: `color-mix(in srgb, var(--${verdict.c}) 40%, transparent)` } },
-                h(Icon, { name: verdict.icon, size: 12 }), verdict.t)),
+              h('span', { className: 'chip', style: { height: 24, fontSize: 11, color: 'var(--text-2)', borderColor: 'var(--line)', background: 'var(--panel-2)' } },
+                h('span', { className: 'dot', style: { background: `var(--${verdict.c})` } }), verdict.t)),
             // form-build mini timeline bar
             h(PhaseBar, { weeksToRace, taperWeeks: effTw }),
-            h(AiInsight, { title: 'KI-Taper-Analyse' },
+            // ruhige Zusammenfassung (Apple-Fußnoten-Stil statt violetter KI-Box)
+            h('div', { style: { padding: '14px 16px', borderRadius: 12, background: 'var(--panel-2)', border: '1px solid var(--line-soft)' } },
               h('div', { className: 'col gap-8' },
-                h('span', null,
+                h('span', { className: 'label', style: { fontSize: 9.5, color: 'var(--text-4)' } }, 'Zusammenfassung'),
+                h('span', { style: { fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-2)' } },
                   `Bei einem Aufbau bis CTL ${Math.round(peakCtl)} und einem ${effTw}-Wochen-Taper mit −${dropPct}% Volumen `,
                   `landet deine Form am ${ev.dateLbl} bei `,
-                  h('strong', { style: { color: `var(--${band.c})` } }, `${race.tsb > 0 ? '+' : ''}${Math.round(race.tsb)} TSB`),
+                  h('strong', { style: { color: `var(--${band.c})`, fontWeight: 600 } }, `${race.tsb > 0 ? '+' : ''}${Math.round(race.tsb)} TSB`),
                   ` (${band.note}). `,
                   Math.abs(peakOff) <= 1
                     ? 'Der Form-Gipfel fällt genau auf den Renntag. '
                     : `Der Gipfel liegt ${Math.abs(peakOff)} Tage ${peakOff < 0 ? 'davor — ein längerer oder sanfterer Taper schiebt ihn nach hinten. ' : 'danach — kürze den Taper leicht. '}`,
                   `Du behältst ${Math.round(race.ctl)} CTL `,
-                  h('strong', null, `(${Math.round(fitnessLoss)} Fitness`),
+                  h('strong', { style: { color: 'var(--text)', fontWeight: 600 } }, `(${Math.round(fitnessLoss)} Fitness`),
                   `) und gewinnst gegenüber „weiter Vollgas" `,
-                  h('strong', { style: { color: 'var(--good)' } }, `+${Math.round(gain)} TSB`),
+                  h('strong', { style: { color: 'var(--text)', fontWeight: 600 } }, `+${Math.round(gain)} TSB`),
                   ' Frische.'),
-                !optimal && mode === 'ai' && h('span', { style: { color: 'var(--text-3)' } }, 'Tipp: Ein höheres Aufbau-Ziel bringt mehr Fitness, verlangt aber einen kräftigeren Taper.'))),
+                !optimal && mode === 'ai' && h('span', { style: { fontSize: 12, color: 'var(--text-4)' } }, 'Tipp: Ein höheres Aufbau-Ziel bringt mehr Fitness, verlangt aber einen kräftigeren Taper.'))),
             // comparison rows: this plan vs no taper
             h('div', { className: 'col gap-2', style: { marginTop: 2 } },
               h('span', { className: 'label', style: { marginBottom: 6 } }, 'Form am Renntag — Vergleich'),
@@ -441,14 +447,14 @@
   function PhaseBar({ weeksToRace, taperWeeks }) {
     const buildW = Math.max(1, weeksToRace - taperWeeks);
     return h('div', { className: 'col gap-6' },
-      h('div', { className: 'row', style: { height: 30, borderRadius: 9, overflow: 'hidden', gap: 2 } },
-        h('div', { style: { flex: `${buildW} 1 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--z4) 22%, transparent)', borderTop: '2px solid var(--z4)', minWidth: 0 } },
-          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden' } }, `Aufbau · ${buildW} Wo`)),
-        h('div', { style: { flex: `${taperWeeks} 1 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--z5) 22%, transparent)', borderTop: '2px solid var(--z5)', minWidth: 0 } },
-          h('span', { className: 'mono', style: { fontSize: 10.5, color: 'var(--z5)', whiteSpace: 'nowrap', overflow: 'hidden' } }, `Taper · ${taperWeeks} Wo`))),
+      h('div', { className: 'row', style: { height: 26, borderRadius: 8, overflow: 'hidden', gap: 2 } },
+        h('div', { style: { flex: `${buildW} 1 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--z4) 12%, transparent)', minWidth: 0 } },
+          h('span', { style: { fontSize: 10.5, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden' } }, `Aufbau · ${buildW} Wo`)),
+        h('div', { style: { flex: `${taperWeeks} 1 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--z5) 12%, transparent)', minWidth: 0 } },
+          h('span', { style: { fontSize: 10.5, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden' } }, `Taper · ${taperWeeks} Wo`))),
       h('div', { className: 'row between', style: { fontSize: 9.5 } },
         h('span', { className: 'label' }, 'Heute'),
-        h('span', { className: 'label', style: { color: 'var(--z5)' } }, 'Renntag')));
+        h('span', { className: 'label' }, 'Renntag')));
   }
 
   /* comparison bar (TSB can be negative → centred at zero) */
@@ -458,11 +464,11 @@
     const pos = tsb >= 0;
     return h('div', { className: 'row center gap-12', style: { padding: '5px 0' } },
       h('span', { style: { width: 180, flexShrink: 0, fontSize: 12, color: strong ? 'var(--text)' : 'var(--text-3)', fontWeight: strong ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, label),
-      h('div', { style: { flex: 1, height: 16, position: 'relative', background: 'rgba(255,255,255,.05)', borderRadius: 6, minWidth: 0 } },
-        h('div', { style: { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.18)' } }),
-        h('div', { style: { position: 'absolute', top: 2, bottom: 2, borderRadius: 4,
+      h('div', { style: { flex: 1, height: 14, position: 'relative', background: 'rgba(255,255,255,.04)', borderRadius: 99, minWidth: 0 } },
+        h('div', { style: { position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.12)' } }),
+        h('div', { style: { position: 'absolute', top: 2, bottom: 2, borderRadius: 99,
           left: pos ? '50%' : `${half - w}%`, width: `${w}%`,
-          background: `var(--${color})`, opacity: strong ? 1 : .5 } })),
+          background: `var(--${color})`, opacity: strong ? .9 : .45 } })),
       h('span', { className: 'mono', style: { width: 48, textAlign: 'right', flexShrink: 0, fontSize: 13, fontWeight: 700, color: `var(--${color === 'text-3' ? 'text-3' : color})` } }, `${tsb > 0 ? '+' : ''}${Math.round(tsb)}`));
   }
 

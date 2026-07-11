@@ -1,7 +1,7 @@
 /* FitFlow — Planung (Tag · Woche · Jahr planner, interactive) */
 (function () {
   const { createElement: h, useState, useRef, Fragment } = React;
-  const { Card, Stat, AiInsight, EmptyState } = window.UI;
+  const { Card, Stat, AiInsight, EmptyState, Delta } = window.UI;
   const C = window.Charts;
   const Icon = window.Icon;
   const SPORT = window.UI.SPORT;
@@ -307,12 +307,14 @@
     const maxDayTss = Math.max(...days.map((d) => d.items.reduce((a, it) => a + it.tss, 0)), 1);
     const reco = FF.planner.recoTss;
 
-    return h('div', { className: 'pl-view' },
-      h(Card, {
+    /* one merged card: week grid left, KI-Empfehlung + Wochenbilanz as separated rail right */
+    return h(Card, {
         className: 'pl-main pl-main--week', title: `Kalenderwoche · KW ${kw}`, icon: 'calendar',
         right: h('div', { className: 'row center gap-8' },
           h('span', { className: 'chip chip--solid' }, h(Icon, { name: 'flame', size: 12 }), 'Load · Polarisiert')),
       },
+      h('div', { className: 'pl-merge' },
+        h('div', { className: 'col', style: { minWidth: 0 } },
         h('div', { className: 'ff-week-scroll' },
           h('div', { className: 'ff-week-grid' }, days.map((d, di) => {
             const dayTss = d.items.reduce((s, it) => s + it.tss, 0);
@@ -346,27 +348,33 @@
         h('div', { className: 'row center gap-6', style: { marginTop: 12, justifyContent: 'center', fontSize: 10.5, color: 'var(--text-4)' } },
           h(Icon, { name: 'info', size: 11 }), 'Einheit ziehen, um sie auf einen anderen Tag zu verschieben · Tag anklicken für die Zeitstrahl-Ansicht')),
 
-      h('div', { className: 'col', style: { gap: 18, alignSelf: 'start' } },
-        h(Card, { title: 'KI-Empfehlung', icon: 'spark' },
+        /* RIGHT RAIL — same card, sections separated by hairlines */
+        h('div', { className: 'pl-rail col' },
           h('div', { className: 'col gap-14' },
+            h('div', { className: 'row center gap-8' },
+              h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'spark', size: 16 })),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'KI-Empfehlung')),
             h('div', { className: 'row between center' },
               h(Stat, { label: 'Empfohlene Wochenload', value: reco, unit: 'TSS', accent: 'accent' }),
               h(C.ProgressRing, { value: plannedTss, max: reco, color: 'accent', size: 76, stroke: 8 },
                 h('span', { className: 'metric', style: { fontSize: 15 } }, `${Math.round((plannedTss / reco) * 100)}%`))),
             h(AiInsight, null, `Polarisierter Block: 2 harte Reize (Di Sweet-Spot, Do VO₂max) und am Samstag die lange GA2-Ausfahrt. Aktuell ${plannedTss} von ${reco} TSS verplant — ${plannedTss < reco ? `noch ${reco - plannedTss} TSS Spielraum.` : 'Ziel erreicht.'}`),
             suggestions > 0 && h('button', { className: 'btn btn--sm btn--primary', style: { width: '100%' }, onClick: onAcceptAll },
-              h(Icon, { name: 'check', size: 14 }), `${suggestions} KI-Vorschläge übernehmen`))),
-        h(Card, { title: 'Wochenbilanz', icon: 'target' },
-          h('div', { className: 'ff-grid grid-2', style: { gap: 12, marginBottom: 16 } },
-            h(MiniStat, { label: 'Einheiten', value: sessionCount, color: 'accent', icon: 'activity' }),
-            h(MiniStat, { label: 'Dauer', value: fmt.dur(plannedDur), color: 'info', icon: 'clock' }),
-            h(MiniStat, { label: 'Load', value: plannedTss, unit: 'TSS', color: 'z4', icon: 'flame' }),
-            h(MiniStat, { label: 'Ø Intensität', value: 'Mittel', color: 'z3', icon: 'gauge' })),
-          h('span', { className: 'label', style: { display: 'block', marginBottom: 10 } }, 'Geplante Intensität'),
-          h(C.StackedZoneBar, { parts: zonePct, height: 12 }),
-          h('div', { className: 'row gap-10 wrap', style: { marginTop: 12 } }, zonePct.filter((z) => z.value > 0).map((z) =>
-            h('span', { key: z.zone, className: 'mono', style: { fontSize: 11, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 5 } },
-              h('span', { style: { width: 7, height: 7, borderRadius: 99, background: `var(--${z.zone})` } }), `${z.zone.toUpperCase()} ${z.value}%`))))));
+              h(Icon, { name: 'check', size: 14 }), `${suggestions} KI-Vorschläge übernehmen`)),
+          h('div', { className: 'pl-rail-sec col' },
+            h('div', { className: 'row center gap-8', style: { marginBottom: 14 } },
+              h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'target', size: 16 })),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'Wochenbilanz')),
+            h('div', { className: 'ff-grid grid-2', style: { gap: 12, marginBottom: 16 } },
+              h(MiniStat, { label: 'Einheiten', value: sessionCount, color: 'accent', icon: 'activity' }),
+              h(MiniStat, { label: 'Dauer', value: fmt.dur(plannedDur), color: 'info', icon: 'clock' }),
+              h(MiniStat, { label: 'Load', value: plannedTss, unit: 'TSS', color: 'z4', icon: 'flame' }),
+              h(MiniStat, { label: 'Ø Intensität', value: 'Mittel', color: 'z3', icon: 'gauge' })),
+            h('span', { className: 'label', style: { display: 'block', marginBottom: 10 } }, 'Geplante Intensität'),
+            h(C.StackedZoneBar, { parts: zonePct, height: 12 }),
+            h('div', { className: 'row gap-10 wrap', style: { marginTop: 12 } }, zonePct.filter((z) => z.value > 0).map((z) =>
+              h('span', { key: z.zone, className: 'mono', style: { fontSize: 11, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 5 } },
+                h('span', { style: { width: 7, height: 7, borderRadius: 99, background: `var(--${z.zone})` } }), `${z.zone.toUpperCase()} ${z.value}%`)))))));
   }
 
   /* =========================================================
@@ -390,13 +398,20 @@
       onAddAt(selDay, `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
     };
 
-    return h('div', { className: 'pl-view' },
-      h(Card, {
+    /* key/value row for the KI-Analyse fact list */
+    const kv = (l, v, col) => h('div', { className: 'row between center', style: { fontSize: 12 } },
+      h('span', { style: { color: 'var(--text-3)' } }, l),
+      h('span', { className: 'mono', style: { fontWeight: 600, color: col ? `var(--${col})` : 'var(--text)' } }, v));
+
+    /* one merged card: timeline left, Bereitschaft + Tagesempfehlung as separated rail right */
+    return h(Card, {
         className: 'pl-main', title: `${d.day} · ${d.date}. ${MONTHS_LONG[d.dateObj.getMonth()]}`, icon: 'calendar',
         right: dayTss > 0
           ? h('span', { className: 'mono', style: { fontSize: 12, color: 'var(--text-2)' } }, `${fmt.dur(dayDur)} · ${dayTss} TSS`)
           : h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--z1)' } }), 'Ruhetag'),
       },
+      h('div', { className: 'pl-merge' },
+        h('div', { className: 'col', style: { minWidth: 0 } },
         h('div', { className: 'pl-tl', style: { height: trackH + 12 } },
           h('div', { className: 'pl-tl-axis', style: { height: trackH } },
             hours.map((hh, i) => h('div', { key: hh, className: 'pl-tl-hour', style: { top: i * HOURH } },
@@ -427,20 +442,36 @@
         h('div', { className: 'row center gap-6', style: { marginTop: 6, justifyContent: 'center', fontSize: 10.5, color: 'var(--text-4)' } },
           h(Icon, { name: 'plus', size: 11 }), 'Auf den Zeitstrahl klicken, um eine Einheit zur gewählten Uhrzeit zu planen')),
 
-      h('div', { className: 'col', style: { gap: 30, alignSelf: 'stretch', justifyContent: 'space-between' } },
-        h(Card, { title: 'Bereitschaft', icon: 'heart' },
-          h('div', { className: 'col center gap-12' },
-            h(C.RecoveryGauge, { value: FF.recovery.score, size: 168, label: 'Recovery Score' }),
-            h('div', { className: 'row gap-8 wrap', style: { justifyContent: 'center' } },
+        /* RIGHT RAIL — same card, sections separated by hairlines */
+        h('div', { className: 'pl-rail col' },
+          /* Bereitschaft — identical Recovery-Score design as on the dashboard */
+          h('div', { className: 'col gap-12' },
+            h('div', { className: 'row center gap-8' },
+              h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'heart', size: 16 })),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'Bereitschaft')),
+            h(C.RecoveryScore, { value: FF.recovery.score }),
+            h('div', { className: 'row center gap-6' }, h(Delta, { value: FF.recovery.trend, suffix: ' vs. gestern' })),
+            h('div', { className: 'row gap-8 wrap' },
               h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--good)' } }), `HRV ${FF.recovery.hrv.val} ms`),
               h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--info)' } }), `Schlaf ${FF.fmt.n(FF.recovery.sleep.val, 1)} h`),
-              h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--warn)' } }), `Ruhepuls ${FF.recovery.rhr.val}`)))),
-        h(Card, { title: 'Tagesempfehlung', icon: 'spark' },
-          h('div', { className: 'col gap-12' },
-            h(AiInsight, { compact: true }, FF.reco.text),
-            h('div', { className: 'ff-grid grid-2', style: { gap: 12 } },
-              h(MiniStat, { label: 'Tagesziel', value: dayTss || '—', unit: dayTss ? 'TSS' : '', color: 'accent', icon: 'target' }),
-              h(MiniStat, { label: 'Fokus', value: focusZone ? focusZone.toUpperCase() : 'Reg.', color: focusZone || 'z1', icon: 'flame' }))))));
+              h('span', { className: 'chip' }, h('span', { className: 'dot', style: { background: 'var(--warn)' } }), `Ruhepuls ${FF.recovery.rhr.val}`))),
+          /* Tagesempfehlung — one rich KI-Analyse block */
+          h('div', { className: 'pl-rail-sec col gap-12' },
+            h('div', { className: 'row center gap-8' },
+              h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'spark', size: 16 })),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'Tagesempfehlung')),
+            h('div', { className: 'ff-ai-border col gap-10', style: { padding: '14px 15px', borderRadius: 12, background: 'var(--accent-soft)' } },
+              h('div', { className: 'row center gap-7' },
+                h('span', { style: { color: 'var(--accent-bright)', display: 'flex' } }, h(Icon, { name: 'spark', size: 14 })),
+                h('span', { className: 'label', style: { color: 'var(--accent-bright)', letterSpacing: '.1em' } }, 'KI-Analyse')),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 650, color: 'var(--text)', lineHeight: 1.3 } }, FF.reco.headline),
+              h('span', { style: { fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-2)' } }, FF.reco.text),
+              h('div', { className: 'col gap-7', style: { paddingTop: 10, borderTop: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)' } },
+                kv('Fokus heute', FF.reco.focus, 'accent-bright'),
+                kv('Belastungsfenster', `${FF.reco.tssLo}–${FF.reco.tssHi} TSS`),
+                kv('Belastungsband', FF.reco.band),
+                kv('Geplant', dayTss > 0 ? `${dayTss} TSS · ${fmt.dur(dayDur)}` : 'Ruhetag'),
+                focusZone ? kv('Fokuszone', focusZone.toUpperCase(), focusZone) : null))))));
   }
 
   /* =========================================================
@@ -461,10 +492,11 @@
     const phaseLabel = { Recovery: 'Erholung', 'Off-Season': 'Grundlage', Load: 'Aufbau' };
 
     const peakCtl = Math.round(Math.max(...FF.annual.ctlTarget));
-    return h('div', { className: 'pl-view' },
-      h(Card, { className: 'pl-main', title: 'Saison 2026 · Trainingslast', icon: 'year',
+    /* one merged card: season strip left, Saison-Überblick + Wettkämpfe as separated rail right */
+    return h(Card, { className: 'pl-main', title: 'Saison 2026 · Trainingslast', icon: 'year',
         right: h('span', { className: 'mono', style: { fontSize: 12, color: 'var(--text-3)' } }, 'Woche 23 / 52') },
-        h('div', { className: 'col', style: { flex: 1, gap: 0, minHeight: 0 } },
+      h('div', { className: 'pl-merge' },
+        h('div', { className: 'col', style: { flex: 1, gap: 0, minHeight: 0, minWidth: 0 } },
           /* phase ribbon */
           h('div', { className: 'pl-ribbon', style: { marginBottom: 4 } }, blocks.map((b, i) =>
             h('div', { key: i, className: 'pl-ribbon-seg', style: { width: `${((b.end - b.start) / 12) * 100}%`, background: `color-mix(in srgb, var(--${b.color}) 30%, transparent)`, color: 'var(--text)' } },
@@ -504,32 +536,40 @@
                   h('span', { key: z, className: 'mono', style: { fontSize: 11, color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 5 } },
                     h('span', { style: { width: 8, height: 8, borderRadius: 2, background: `var(--${z})` } }), l))),
             h('span', { className: 'mono', style: { fontSize: 11, color: 'var(--accent-bright)', display: 'inline-flex', alignItems: 'center', gap: 5 } },
-              h('span', { style: { width: 8, height: 2, background: 'var(--accent-bright)' } }), 'Heute')))),
+              h('span', { style: { width: 8, height: 2, background: 'var(--accent-bright)' } }), 'Heute'))),
 
-      h('div', { className: 'col', style: { gap: 30, alignSelf: 'stretch', justifyContent: 'space-between' } },
-        h(Card, { title: 'Saison-Überblick', icon: 'target' },
-          h('div', { className: 'ff-grid grid-2', style: { gap: 12 } },
-            h(MiniStat, { label: 'Aktuelle Phase', value: 'Aufbau', color: 'z4', icon: 'flame' }),
-            h(MiniStat, { label: 'CTL → Peak', value: `${FF.fitnessScore} → ${peakCtl}`, color: 'accent', icon: 'year' }),
-            h(MiniStat, { label: 'Wettkämpfe', value: events.length, color: 'info', icon: 'trophy' }),
-            h(MiniStat, { label: 'Bis A-Wettkampf', value: aEvent ? weeksTo(aEvent.date) : '—', unit: aEvent ? 'Wo' : '', color: 'z5', icon: 'clock' }))),
-        h(Card, { title: 'Wettkämpfe & Ziele', icon: 'trophy',
-          right: h('button', { className: 'btn btn--sm btn--primary', onClick: onAddEvent }, h(Icon, { name: 'plus', size: 14 }), 'Wettkampf') },
-          events.length === 0
-            ? h('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--text-4)', fontSize: 13 } }, 'Noch keine Wettkämpfe geplant.')
-            : h('div', { className: 'col gap-10' }, events.slice().sort((a, b) => new Date(a.date) - new Date(b.date)).map((e, i) => {
-                const col = e.type === 'A' ? 'z5' : e.type === 'B' ? 'z4' : 'text-3';
-                return h('div', { key: i, className: 'pl-evt' },
-                  h('span', { className: 'pl-badge mono', style: { background: `color-mix(in srgb, var(--${col}) 20%, transparent)`, color: `var(--${col})` } }, e.type),
-                  h('div', { className: 'col', style: { flex: 1, minWidth: 0, lineHeight: 1.3 } },
-                    h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, e.name),
-                    h('span', { className: 'mono', style: { fontSize: 11.5, color: 'var(--text-3)' } },
-                      `${fmt.date(new Date(e.date))} 2026${e.dist ? ' · ' + e.dist : ''}`)),
-                  h('div', { className: 'col', style: { alignItems: 'flex-end', lineHeight: 1.3 } },
-                    h('span', { className: 'metric', style: { fontSize: 17 } }, weeksTo(e.date)),
-                    h('span', { className: 'label' }, 'Wochen')),
-                  h('button', { className: 'ff-xbtn', style: { marginLeft: 4 }, onClick: () => onRemoveEvent(i) }, h(Icon, { name: 'x', size: 13 })));
-              })))));
+        /* RIGHT RAIL — same card, sections separated by hairlines */
+        h('div', { className: 'pl-rail col' },
+          h('div', { className: 'col gap-12' },
+            h('div', { className: 'row center gap-8' },
+              h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'target', size: 16 })),
+              h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'Saison-Überblick')),
+            h('div', { className: 'ff-grid grid-2', style: { gap: 12 } },
+              h(MiniStat, { label: 'Aktuelle Phase', value: 'Aufbau', color: 'z4', icon: 'flame' }),
+              h(MiniStat, { label: 'CTL → Peak', value: `${FF.fitnessScore} → ${peakCtl}`, color: 'accent', icon: 'year' }),
+              h(MiniStat, { label: 'Wettkämpfe', value: events.length, color: 'info', icon: 'trophy' }),
+              h(MiniStat, { label: 'Bis A-Wettkampf', value: aEvent ? weeksTo(aEvent.date) : '—', unit: aEvent ? 'Wo' : '', color: 'z5', icon: 'clock' }))),
+          h('div', { className: 'pl-rail-sec col gap-12' },
+            h('div', { className: 'row between center gap-8' },
+              h('div', { className: 'row center gap-8' },
+                h('span', { style: { color: 'var(--text-3)', display: 'flex' } }, h(Icon, { name: 'trophy', size: 16 })),
+                h('span', { className: 'strong', style: { fontSize: 14.5, fontWeight: 600, color: 'var(--text)' } }, 'Wettkämpfe & Ziele')),
+              h('button', { className: 'btn btn--sm btn--primary', onClick: onAddEvent }, h(Icon, { name: 'plus', size: 14 }), 'Wettkampf')),
+            events.length === 0
+              ? h('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--text-4)', fontSize: 13 } }, 'Noch keine Wettkämpfe geplant.')
+              : h('div', { className: 'col gap-10' }, events.slice().sort((a, b) => new Date(a.date) - new Date(b.date)).map((e, i) => {
+                  const col = e.type === 'A' ? 'z5' : e.type === 'B' ? 'z4' : 'text-3';
+                  return h('div', { key: i, className: 'pl-evt' },
+                    h('span', { className: 'pl-badge mono', style: { background: `color-mix(in srgb, var(--${col}) 20%, transparent)`, color: `var(--${col})` } }, e.type),
+                    h('div', { className: 'col', style: { flex: 1, minWidth: 0, lineHeight: 1.3 } },
+                      h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600 } }, e.name),
+                      h('span', { className: 'mono', style: { fontSize: 11.5, color: 'var(--text-3)' } },
+                        `${fmt.date(new Date(e.date))} 2026${e.dist ? ' · ' + e.dist : ''}`)),
+                    h('div', { className: 'col', style: { alignItems: 'flex-end', lineHeight: 1.3 } },
+                      h('span', { className: 'metric', style: { fontSize: 17 } }, weeksTo(e.date)),
+                      h('span', { className: 'label' }, 'Wochen')),
+                    h('button', { className: 'ff-xbtn', style: { marginLeft: 4 }, onClick: () => onRemoveEvent(i) }, h(Icon, { name: 'x', size: 13 })));
+                }))))));
   }
 
   /* =========================================================

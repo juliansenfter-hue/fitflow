@@ -205,6 +205,34 @@
     useEffect(() => window.FFLive.subscribe(() => bump((n) => n + 1)), []);
 
     useEffect(() => { location.hash = route; }, [route]);
+
+    /* Leichtes Aufblenden der Panels bei jedem Screen-Wechsel (Dashboard→Jahr usw.).
+       Der erste Render wird übersprungen — dort spielt bereits die Intro-Staffelung.
+       ScreenBoundary ist per route gekeyt → die .ff-content-Kinder sind bei jedem
+       Wechsel frische Elemente, auf die wir kurz die dezente ffFadeSwitch-Animation legen. */
+    const firstRoute = useRef(true);
+    useEffect(() => {
+      if (firstRoute.current) { firstRoute.current = false; return; }
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const host = document.querySelector('.ff-content');
+      if (!host) return;
+      // WICHTIG: die Glas-Kästchen SELBST faden, nicht ihre Wrapper. Ein animierter
+      // Wrapper wird zum Backdrop-Root → das Glas darin zeigt während des Fades das
+      // Wallpaper nicht (wirkt flach) und „ploppt" erst am Animationsende um. Die
+      // Panels selbst dürfen dagegen faden und sampeln dabei durchgehend den echten
+      // Hintergrund — deshalb kann der Fade hier ruhig und gestaffelt laufen.
+      const els = [...host.querySelectorAll('.panel, .tile')];
+      if (!els.length) els.push(...host.children);
+      els.forEach((el, i) => {
+        el.classList.add('screen-enter'); // Glas-Engine vermisst am Fade-Ende sofort neu
+        el.style.animation = 'ffFadeSwitch .3s cubic-bezier(.22,.61,.36,1) both';
+        el.style.animationDelay = Math.min(i * 0.03, 0.18).toFixed(2) + 's';
+      });
+      const tid = setTimeout(() => els.forEach((el) => {
+        el.style.animation = ''; el.style.animationDelay = ''; el.classList.remove('screen-enter');
+      }), 650);
+      return () => clearTimeout(tid);
+    }, [route]);
     useEffect(() => {
       const r = document.documentElement;
       r.style.setProperty('--accent', t.accent);

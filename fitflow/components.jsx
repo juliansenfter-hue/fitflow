@@ -225,12 +225,13 @@
           grp.items.map((it) => h(NavItem, { key: it.id, item: it, active: current === it.id, onClick: () => onNav(it.id) }))))),
       h('div', { className: 'ff-side-foot' },
         h('button', { className: 'ff-profile-btn' + (current === 'profil' ? ' is-active' : ''), onClick: () => onNav('profil'), title: 'Profileinstellungen' },
-          h(Avatar, { initials: a.initials, size: 36 }),
-          h('div', { className: 'col', style: { lineHeight: 1.25, minWidth: 0, flex: 1, textAlign: 'left' } },
+          h(Avatar, { initials: a.initials, size: 38 }),
+          h('div', { className: 'col', style: { lineHeight: 1.3, minWidth: 0, flex: 1, textAlign: 'left' } },
             h('div', { className: 'row center gap-6' },
-              h('span', { className: 'strong', style: { fontSize: 13, fontWeight: 600 } }, a.name),
-              h('span', { style: { fontSize: 9.5, fontWeight: 600, letterSpacing: '.02em', color: 'var(--accent-bright)', background: 'var(--accent-soft)', padding: '2px 7px', borderRadius: 99 } }, a.plan)),
-            h('span', { style: { fontSize: 11, color: 'var(--text-3)' } }, 'Athlet')))));
+              h('span', { className: 'strong', style: { fontSize: 13.5, fontWeight: 600, letterSpacing: '-.01em' } }, a.name),
+              h('span', { style: { fontSize: 9.5, fontWeight: 700, letterSpacing: '.03em', color: 'var(--accent-bright)', background: 'var(--accent-soft)', padding: '2px 7px', borderRadius: 99 } }, a.plan)),
+            h('span', { style: { fontSize: 11, color: 'var(--text-3)' } }, 'Athlet')),
+          h('span', { className: 'ff-prof-chev', style: { display: 'flex' } }, h(Icon, { name: 'chevR', size: 15 })))));
   }
 
   function Topbar({ title, sub, onMenu, children }) {

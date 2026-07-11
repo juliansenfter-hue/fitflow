@@ -485,11 +485,19 @@ body::after{
 }
 .ff-nav.is-active svg{color:var(--accent-bright)}
 .ff-side-foot{padding-top:14px;border-top:1px solid var(--line);margin-top:6px}
-.ff-profile-btn{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);cursor:pointer;text-align:left;transition:background .2s var(--ease),border-color .2s var(--ease)}
+/* profile button: subtle Apple-style row (avatar · name · chevron) */
+.ff-profile-btn{
+  display:flex;align-items:center;gap:11px;width:100%;padding:10px 11px;border-radius:14px;
+  background:var(--panel-2);border:1px solid var(--line);
+  cursor:pointer;text-align:left;
+  transition:background .2s var(--ease),border-color .2s var(--ease),transform .12s var(--ease)
+}
 .ff-profile-btn:hover{background:var(--panel-3,var(--panel-2));border-color:var(--line-2,var(--line))}
-.ff-profile-btn:hover svg{color:var(--text-3)}
+.ff-profile-btn:active{transform:scale(.985)}
 .ff-profile-btn.is-active{border-color:var(--accent-soft);background:var(--accent-soft)}
-.ff-profile-btn.is-active svg{color:var(--accent-bright)}
+.ff-profile-btn .ff-prof-chev{margin-left:2px;flex-shrink:0;color:var(--text-3);opacity:.55;transition:transform .2s var(--ease),opacity .2s var(--ease)}
+.ff-profile-btn:hover .ff-prof-chev{opacity:.9;transform:translateX(2px)}
+.ff-profile-btn.is-active .ff-prof-chev{color:var(--accent-bright);opacity:.9}
 
 .ff-main{flex:1;min-width:0;display:flex;flex-direction:column}
 .ff-topbar{
@@ -554,6 +562,8 @@ body::after{
 body.ff-intro-hold .ff-sidebar .ff-logo{opacity:0}
 
 @keyframes ffCardIn{from{opacity:0;transform:translateY(20px) scale(.985)}to{opacity:1;transform:none}}
+/* leichtes Aufblenden der Panels beim Screen-Wechsel (dezent, nur Opazität — maximal schnell) */
+@keyframes ffFadeSwitch{from{opacity:0}to{opacity:1}}
 
 /* topbar page title — plain large title, no gradient */
 .ff-topbar-title{
@@ -1608,6 +1618,14 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
 /* Wochenkalender: Höhe folgt dem Inhalt statt an die Sidebar gestreckt zu werden */
 .pl-main--week{min-height:0}
 .pl-main>.panel-pad{flex:1;display:flex;flex-direction:column;min-height:0}
+/* Tagesplanung: merged card — timeline left, rail (Bereitschaft/Tagesempfehlung) right */
+.pl-merge{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:24px;flex:1;min-height:0;align-items:stretch}
+.pl-rail{gap:20px;border-left:1px solid var(--line);padding-left:24px;min-width:0}
+.pl-rail-sec{border-top:1px solid var(--line);padding-top:18px}
+@media (max-width:1080px), (max-width:1366px) and (any-pointer:coarse){
+  .pl-merge{grid-template-columns:minmax(0,1fr)}
+  .pl-rail{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:18px}
+}
 .pl-tl{position:relative;display:grid;grid-template-columns:54px 1fr;gap:0}
 .pl-tl-axis{position:relative}
 .pl-tl-hour{position:absolute;left:0;right:0}
@@ -1787,4 +1805,129 @@ textarea.ff-input{height:auto;padding:11px 13px;resize:vertical;line-height:1.5}
   animation:ff-boot-rot .8s linear infinite}
 @keyframes ff-boot-rot{to{transform:rotate(360deg)}}
 .ff-boot-label{font-size:13px;color:var(--text-3);letter-spacing:.01em}
+
+/* ============================================================
+   JAHRESÜBERSICHT — entrance choreography, timeline scrubber,
+   segment transitions (screen-jahresplanung.jsx)
+   ============================================================ */
+/* staggered entrance: each block rises in, delay per --yi index */
+.ff-yr-in{animation:ffCardIn .55s var(--ease) both;animation-delay:calc(var(--yi,0)*70ms)}
+/* after the first visit the screen renders instantly and stays put */
+.ff-yr-still .ff-yr-in,.ff-yr-still .ff-yr-zone{animation:none}
+/* phase zones inside the plot fade in left → right after the card lands */
+.ff-yr-zone{animation:ffYrZone .5s var(--ease) both;animation-delay:calc(180ms + var(--yi,0)*80ms)}
+@keyframes ffYrZone{from{opacity:0;transform:translateY(8px)}to{transform:none}}
+/* footer phase detail swaps with a soft rise */
+.ff-yr-swap{animation:ffFadeUp .32s var(--ease) both}
+/* today marker breathes gently so "jetzt" is findable at a glance */
+.ff-yr-today{animation:ffYrPulse 2.8s var(--ease-soft) infinite}
+@keyframes ffYrPulse{
+  0%,100%{box-shadow:0 0 10px color-mix(in srgb,var(--accent) 60%,transparent)}
+  50%{box-shadow:0 0 20px color-mix(in srgb,var(--accent) 95%,transparent)}}
+/* scrubber: hairline + value pill follow the pointer 1:1 across the year */
+.ff-yr-scrub{position:absolute;top:0;bottom:0;width:1px;z-index:7;pointer-events:none;
+  background:rgba(255,255,255,.4)}
+.ff-yr-scrub-pill{position:absolute;z-index:8;pointer-events:none;transform:translateX(-50%);
+  display:flex;align-items:center;gap:7px;white-space:nowrap;padding:4px 9px;border-radius:8px;
+  background:rgba(20,21,28,.88);border:1px solid var(--line-2);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:0 10px 26px -12px rgba(0,0,0,.8);
+  font-size:11px;font-variant-numeric:tabular-nums;color:var(--text)}
+.ff-yr-scrub-dot{position:absolute;z-index:8;pointer-events:none;width:10px;height:10px;border-radius:99px;
+  transform:translate(-50%,-50%);background:var(--accent-bright);border:2px solid var(--panel);
+  box-shadow:0 0 10px color-mix(in srgb,var(--accent) 80%,transparent)}
+/* load-phase segments: boundary edits glide instead of jumping */
+.ff-yr-seg{transition:flex-grow .45s var(--ease),background .2s var(--ease),
+  border-color .2s var(--ease),box-shadow .2s var(--ease),transform .15s var(--ease)}
+.ff-yr-seg:active{transform:scale(.985)}
+/* intensity bar: zone widths ease when nudged */
+.ff-yr-dist>div>div{transition:width .45s var(--ease)}
+/* stepper buttons: instant press feedback on pointer-down */
+.ff-yr-step{transition:background .2s var(--ease),border-color .2s var(--ease),transform .12s var(--ease)}
+.ff-yr-step:hover:not(:disabled){background:var(--panel-3,rgba(255,255,255,.09));border-color:var(--line-2)}
+.ff-yr-step:active:not(:disabled){transform:scale(.9)}
+/* season progress bar grows in once on mount */
+.ff-yr-bar{height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.ff-yr-bar>span{display:block;height:100%;border-radius:inherit;width:0;
+  background:linear-gradient(90deg,var(--accent-deep),var(--accent-bright));
+  transition:width 1.1s var(--ease)}
+/* segmented phase bar under the plot (Apple-Fitness-style rounded segments) */
+.ff-yr-phasebar{position:relative;display:flex;gap:3px;height:26px;margin-top:10px}
+.ff-yr-phaseseg{border:0;padding:0;min-width:0;cursor:pointer;border-radius:8px;
+  background:color-mix(in srgb,var(--seg-c) 34%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10);
+  transition:background .2s var(--ease),opacity .2s var(--ease),
+    transform .15s var(--ease),box-shadow .2s var(--ease)}
+.ff-yr-phaseseg:hover{background:color-mix(in srgb,var(--seg-c) 55%,transparent)}
+.ff-yr-phaseseg:active{transform:scaleY(.9)}
+.ff-yr-phaseseg.is-sel{background:color-mix(in srgb,var(--seg-c) 60%,transparent);
+  box-shadow:0 0 0 2px var(--accent-bright),inset 0 1px 0 rgba(255,255,255,.14)}
+.ff-yr-phaseseg.is-dim{opacity:.38}
+/* today notch on the bar — mirrors the plot's today line for spatial consistency */
+.ff-yr-phasebar-now{position:absolute;top:-4px;bottom:-4px;width:2px;border-radius:2px;
+  background:var(--accent-bright);transform:translateX(-1px);pointer-events:none;
+  box-shadow:0 0 8px color-mix(in srgb,var(--accent) 70%,transparent)}
+/* Trainingsfokus — tinted phase tiles (fill the card height), mini season strip,
+   body unfolds via grid-rows */
+.ff-yr-acc{position:relative;flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;
+  border:1px solid color-mix(in srgb,var(--acc-c) 20%,var(--line));border-radius:14px;overflow:hidden;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--acc-c) 11%,transparent),
+    color-mix(in srgb,var(--acc-c) 3%,transparent) 65%,transparent);
+  transition:border-color .25s var(--ease),box-shadow .25s var(--ease)}
+.ff-yr-acc:hover{border-color:color-mix(in srgb,var(--acc-c) 42%,transparent)}
+.ff-yr-acc.is-active{border-color:color-mix(in srgb,var(--acc-c) 48%,transparent);
+  box-shadow:0 14px 32px -24px color-mix(in srgb,var(--acc-c) 75%,transparent),
+    inset 0 1px 0 rgba(255,255,255,.08)}
+.ff-yr-acc-head{display:flex;flex-direction:column;align-items:stretch;width:100%;padding:13px 16px;border:0;
+  background:transparent;cursor:pointer;font-family:inherit;color:var(--text);text-align:left;
+  transition:background .2s var(--ease)}
+.ff-yr-acc-head:hover{background:rgba(255,255,255,.03)}
+.ff-yr-acc-ic{width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--acc-c) 18%,transparent);color:var(--acc-c)}
+.ff-yr-acc-strip{position:relative;display:block;height:6px;border-radius:99px;
+  background:rgba(255,255,255,.06);margin-top:12px;width:100%}
+.ff-yr-acc-strip .sgm{position:absolute;top:0;bottom:0;border-radius:99px;background:var(--acc-c);opacity:.5}
+.ff-yr-acc-strip .sgm.is-now{opacity:1}
+.ff-yr-acc-strip .now{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:2px;
+  background:var(--accent-bright);box-shadow:0 0 6px color-mix(in srgb,var(--accent) 70%,transparent)}
+.ff-yr-acc-chev{display:flex;flex-shrink:0;color:var(--text-4);transition:transform .3s var(--ease)}
+.ff-yr-acc.is-open .ff-yr-acc-chev{transform:rotate(90deg)}
+.ff-yr-acc-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s var(--ease)}
+.ff-yr-acc.is-open .ff-yr-acc-body{grid-template-rows:1fr}
+.ff-yr-acc-inner{overflow:hidden;min-height:0}
+/* Load-Planer: tinted method detail sheet + per-zone tracks */
+.ff-yr-sheet{padding:15px 16px;border-radius:14px;
+  border:1px solid color-mix(in srgb,var(--sheet-c) 24%,var(--line));
+  background:linear-gradient(160deg,color-mix(in srgb,var(--sheet-c) 9%,transparent),transparent 70%);
+  transition:border-color .25s var(--ease)}
+.ff-yr-ztrack{flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.ff-yr-ztrack>span{display:block;height:100%;border-radius:inherit;transition:width .45s var(--ease)}
+/* load-segment boundary handles — grab & pull, 1:1 while dragging */
+.ff-yr-handle{position:absolute;top:-7px;bottom:-7px;width:24px;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;cursor:ew-resize;z-index:3;touch-action:none;
+  transition:left .45s var(--ease)}
+.ff-yr-segbar.is-dragging .ff-yr-handle{transition:none}
+/* slim bright pin, dead-centre in the gap — generous invisible hit area around it */
+.ff-yr-handle-grip{width:5px;height:30px;border-radius:99px;
+  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.6));
+  box-shadow:0 0 0 3px rgba(5,7,15,.5),0 2px 8px rgba(0,0,0,.55);
+  transition:transform .15s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease)}
+.ff-yr-handle:hover .ff-yr-handle-grip{transform:scaleY(1.12);
+  box-shadow:0 0 0 3px rgba(5,7,15,.5),0 0 14px color-mix(in srgb,var(--accent) 70%,transparent)}
+.ff-yr-handle.is-drag .ff-yr-handle-grip{transform:scaleY(1.2);
+  background:linear-gradient(180deg,var(--accent-bright),var(--accent));
+  box-shadow:0 0 0 3px rgba(5,7,15,.5),0 0 18px color-mix(in srgb,var(--accent) 90%,transparent)}
+.ff-yr-handle-pill{position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);
+  padding:2px 8px;border-radius:7px;background:rgba(20,21,28,.92);border:1px solid var(--line-2);
+  font-size:10.5px;font-weight:600;color:var(--accent-bright);white-space:nowrap;pointer-events:none}
+.ff-yr-segbar.is-dragging .ff-yr-seg{transition:none}
+@media (prefers-reduced-motion:reduce){
+  .ff-yr-in,.ff-yr-zone,.ff-yr-swap,.ff-yr-today{animation:none}
+  .ff-yr-seg,.ff-yr-phaseseg{transition:none}
+  .ff-yr-dist>div>div{transition:none}
+  .ff-yr-bar>span{transition:none}
+  .ff-yr-acc-body,.ff-yr-acc-chev{transition:none}
+  .ff-yr-ztrack>span{transition:none}
+}
 
