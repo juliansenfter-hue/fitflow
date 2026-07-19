@@ -444,8 +444,8 @@
 
         // ---- footer: sign out, then the danger zone tucked underneath
         h('div', { className: 'col gap-12', style: { marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--line-soft)' } },
-          h('button', { className: 'btn btn--outline', style: { width: '100%' }, onClick: () => Auth.logout() },
-            h(Icon, { name: 'logout', size: 16 }), 'Abmelden'),
+          // Abmelden entfernt: App laeuft ohne Login (Demo-Modus)
+          false,
           pane === 'delete'
             ? h('div', { className: 'ff-acct-confirm' },
                 h('div', { className: 'row center gap-8', style: { marginBottom: 6 } },
