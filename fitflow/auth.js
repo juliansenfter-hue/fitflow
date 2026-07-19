@@ -32,7 +32,8 @@
   var client = null;
   var ready = false;       // first session check done?
   var recovery = false;    // arrived via a password-reset link?
-  var demo = false;        // local demo bypass active?
+  var demo = true;         // Login entfernt: App startet immer im Demo-Dashboard (ohne Anmeldung).
+                           // Nur eine echte Supabase-Session (falls vorhanden) hebt den Bypass auf.
   var user = null;         // current Supabase user object (or null)
   var testUser = null;     // local „neues, leeres Konto"-Testbypass (keine echte Mail nötig)
 
